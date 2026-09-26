@@ -16,13 +16,9 @@ import { OfflineManagerModal } from './components/OfflineManagerModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { NotificationSettingsModal } from './components/NotificationSettingsModal';
 
-import {
-  BARCELONA_LINES,
-  INITIAL_VEHICLES,
-  SERVICE_NOTICES,
-  ALL_BARCELONA_STATIONS
-} from './data/barcelonaData';
 import { BARCELONA_LANDMARKS } from './data/landmarksData';
+import { useNow, useTmbNetwork } from './hooks/useTmbNetwork';
+import { NetworkLoadingScreen } from './components/NetworkLoadingScreen';
 import { CITIES } from './data/cities';
 import {
   TransitType,
@@ -37,14 +33,13 @@ import {
   OfflinePackageState
 } from './types/transit';
 import { playAlertNotificationSound } from './utils/sound';
-import {
-  getOfflinePackageState,
-  getCachedLines,
-  getCachedStations,
-  getCachedLandmarks
-} from './services/offlineStorage';
+import { getOfflinePackageState, getCachedLandmarks } from './services/offlineStorage';
 
 export default function App() {
+  // Official TMB network (GTFS) + live clock
+  const networkStatus = useTmbNetwork();
+  const network = networkStatus.state === 'ready' ? networkStatus.network : null;
+  const now = useNow(1000);
   // Navigation & Localization
   const [activeTab, setActiveTab] = useState<'map' | '3d' | 'landmarks' | 'lines' | 'alerts' | 'notices'>('map');
   const [lang, setLang] = useState<Language>('es');
@@ -85,7 +80,7 @@ export default function App() {
       enableDisruptions: true,
       enableSound: true,
       enablePushNotifications: false,
-      subscribedLineCodes: ['L1', 'L3', 'R1', 'R2 Nord', 'H12'],
+      subscribedLineCodes: ['L1', 'L3', 'L5', 'H12'],
       timeFilterEnabled: false,
       activeStartTime: '07:00',
       activeEndTime: '22:00'
@@ -93,20 +88,9 @@ export default function App() {
   });
   const [isNotifSettingsOpen, setIsNotifSettingsOpen] = useState<boolean>(false);
 
-  // Data (switches automatically to cached data when offline pack is used)
-  const linesData = useMemo(() => {
-    if (offlineState.isDownloaded || !isBrowserOnline || offlineState.isSimulatedOffline) {
-      return getCachedLines();
-    }
-    return BARCELONA_LINES;
-  }, [offlineState.isDownloaded, isBrowserOnline, offlineState.isSimulatedOffline]);
-
-  const stationsData = useMemo(() => {
-    if (offlineState.isDownloaded || !isBrowserOnline || offlineState.isSimulatedOffline) {
-      return getCachedStations();
-    }
-    return ALL_BARCELONA_STATIONS;
-  }, [offlineState.isDownloaded, isBrowserOnline, offlineState.isSimulatedOffline]);
+  // Real TMB lines & stations from the GTFS feed (cached for offline use by the service worker)
+  const linesData = useMemo<TransitLine[]>(() => network?.lines ?? [], [network]);
+  const stationsData = useMemo<Station[]>(() => network?.stations ?? [], [network]);
 
   const landmarksData = useMemo(() => {
     if (offlineState.isDownloaded || !isBrowserOnline || offlineState.isSimulatedOffline) {
@@ -115,8 +99,25 @@ export default function App() {
     return BARCELONA_LANDMARKS;
   }, [offlineState.isDownloaded, isBrowserOnline, offlineState.isSimulatedOffline]);
 
-  // Live vehicles state
-  const [vehicles, setVehicles] = useState<LiveVehicle[]>(INITIAL_VEHICLES);
+  // Test incidents injected from the notification settings (lineCode -> delay minutes)
+  const [testIncidents, setTestIncidents] = useState<Record<string, number>>({});
+
+  // Live vehicles: positions computed every second from the official timetable
+  const vehicles = useMemo<LiveVehicle[]>(() => {
+    if (!network) return [];
+    const list = network.vehiclesAt(now);
+    if (!Object.keys(testIncidents).length) return list;
+    return list.map((v) =>
+      testIncidents[v.lineCode] ? { ...v, delayMinutes: testIncidents[v.lineCode], isDelayed: true } : v
+    );
+  }, [network, now, testIncidents]);
+
+  // Service notices derived from the timetable (refreshed once a minute)
+  const minuteBucket = Math.floor(now / 60000);
+  const serviceNotices = useMemo(
+    () => (network ? network.scheduleNotices(minuteBucket * 60000) : []),
+    [network, minuteBucket]
+  );
 
   // User Custom Trip Alerts (persisted in localStorage)
   const [alerts, setAlerts] = useState<CustomTripAlert[]>(() => {
@@ -129,13 +130,13 @@ export default function App() {
     return [
       {
         id: 'alert-default-01',
-        title: 'Tren R1 hacia Mataró',
-        lineCode: 'R1',
-        type: 'train',
-        originStationId: 'st-catalunya',
-        originStationName: 'Plaça de Catalunya',
-        destinationStationId: 'st-mataro',
-        destinationStationName: 'Mataró Estació',
+        title: 'Metro L1 hacia Fondo',
+        lineCode: 'L1',
+        type: 'metro',
+        originStationId: '1.126',
+        originStationName: 'Catalunya',
+        destinationStationId: '1.140',
+        destinationStationName: 'Fondo',
         targetTime: '08:45',
         notifyMinutesBefore: 10,
         notifyOnDelay: true,
@@ -146,12 +147,12 @@ export default function App() {
       },
       {
         id: 'alert-default-02',
-        title: 'Metro L3 a Universitària',
+        title: 'Metro L3 a Zona Universitària',
         lineCode: 'L3',
         type: 'metro',
-        originStationId: 'st-sants-estacio',
+        originStationId: '1.319',
         originStationName: 'Sants Estació',
-        destinationStationId: 'st-zona-univ',
+        destinationStationId: '1.314',
         destinationStationName: 'Zona Universitària',
         targetTime: '18:15',
         notifyMinutesBefore: 5,
@@ -204,61 +205,6 @@ export default function App() {
     document.documentElement.lang = lang;
   }, [lang]);
 
-  // Live Vehicle Movement Simulation Loop
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setVehicles((prevVehicles) =>
-        prevVehicles.map((veh) => {
-          const line = linesData.find((l) => l.code === veh.lineCode);
-          if (!line || line.pathCoordinates.length < 2) return veh;
-
-          // Advance vehicle progress
-          let newProgress = veh.progressAlongRoute + 0.0035;
-          let newDirection = veh.direction;
-
-          if (newProgress >= 1) {
-            newProgress = 0.99;
-            newDirection = 'inbound';
-          } else if (newProgress <= 0) {
-            newProgress = 0.01;
-            newDirection = 'outbound';
-          }
-
-          // Interpolate GPS lat/lng along path
-          const coords = line.pathCoordinates;
-          const totalPoints = coords.length;
-          const segmentIndex = Math.min(
-            totalPoints - 2,
-            Math.max(0, Math.floor(newProgress * (totalPoints - 1)))
-          );
-          const segmentFraction = (newProgress * (totalPoints - 1)) - segmentIndex;
-
-          const p1 = coords[segmentIndex];
-          const p2 = coords[segmentIndex + 1];
-
-          const newLat = p1[0] + (p2[0] - p1[0]) * segmentFraction;
-          const newLng = p1[1] + (p2[1] - p1[1]) * segmentFraction;
-
-          // Next station lookup
-          const nextSt = line.stations[Math.min(line.stations.length - 1, segmentIndex + 1)];
-
-          return {
-            ...veh,
-            lat: newLat,
-            lng: newLng,
-            progressAlongRoute: newProgress,
-            direction: newDirection,
-            nextStationId: nextSt ? nextSt.id : veh.nextStationId,
-            nextStationName: nextSt ? nextSt.name : veh.nextStationName,
-            etaMinutes: Math.max(1, Math.round((1 - segmentFraction) * 4))
-          };
-        })
-      );
-    }, 1200);
-
-    return () => clearInterval(interval);
-  }, [linesData]);
-
   // Periodic Check for Custom User Alerts & Notification Preferences Filter
   useEffect(() => {
     const alertChecker = setInterval(() => {
@@ -303,23 +249,17 @@ export default function App() {
 
   // Trigger simulated delay incident for testing
   const handleTriggerTestIncident = (lineCode: string, delayMinutes: number) => {
-    setVehicles((prev) =>
-      prev.map((v) =>
-        v.lineCode === lineCode
-          ? { ...v, delayMinutes, isDelayed: true }
-          : v
-      )
-    );
+    setTestIncidents((prev) => ({ ...prev, [lineCode]: delayMinutes }));
 
     const testAlert: CustomTripAlert = {
       id: `incident-alert-${Date.now()}`,
       title: `Incidencia en ${lineCode}: Retraso estimado de ${delayMinutes} min`,
       lineCode,
-      type: lineCode.startsWith('L') ? 'metro' : lineCode.startsWith('H') || lineCode.startsWith('V') ? 'bus' : 'train',
-      originStationId: 'st-catalunya',
-      originStationName: 'Plaça de Catalunya',
-      destinationStationId: 'st-mataro',
-      destinationStationName: 'Dirección Línea',
+      type: linesData.find((l) => l.code === lineCode)?.type ?? 'metro',
+      originStationId: '',
+      originStationName: linesData.find((l) => l.code === lineCode)?.origin ?? '',
+      destinationStationId: '',
+      destinationStationName: linesData.find((l) => l.code === lineCode)?.destination ?? 'Dirección Línea',
       targetTime: 'Ahora',
       notifyMinutesBefore: 0,
       notifyOnDelay: true,
@@ -357,7 +297,7 @@ export default function App() {
   };
 
   const handleOpen3DViewerForLine = (lineCode: string) => {
-    const veh = vehicles.find((v) => v.lineCode === lineCode) || vehicles[0];
+    const veh = vehicles.find((v) => v.lineCode === lineCode) || vehicles[0] || null;
     setViewer3DVehicle(veh);
     setActiveTab('3d');
   };
@@ -375,6 +315,10 @@ export default function App() {
   }, [activeLineCode, linesData]);
 
   const isOffline = !isBrowserOnline || offlineState.isSimulatedOffline;
+
+  if (!network) {
+    return <NetworkLoadingScreen status={networkStatus} lang={lang} />;
+  }
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 text-slate-100">
@@ -415,6 +359,7 @@ export default function App() {
             {/* Leaflet Map Canvas with Landmarks & Offline Handling */}
             <TransitMap
               lines={displayLines}
+              stations={stationsData}
               vehicles={vehicles}
               landmarks={landmarksData}
               showLandmarks={showLandmarksOnMap}
@@ -434,6 +379,8 @@ export default function App() {
             {/* Station Departures Board (when a station is clicked) */}
             <DeparturesBoard
               station={selectedStation}
+              network={network}
+              now={now}
               lines={linesData}
               vehicles={vehicles}
               onClose={() => setSelectedStation(null)}
@@ -444,7 +391,7 @@ export default function App() {
 
             {/* Live Service Notice Ticker */}
             <LiveAlertsBanner
-              notices={SERVICE_NOTICES}
+              notices={serviceNotices}
               activeTripAlarm={activeTripAlarm}
               onDismissAlarm={() => setActiveTripAlarm(null)}
               onOpen3DViewerForLine={handleOpen3DViewerForLine}
@@ -463,7 +410,7 @@ export default function App() {
         {activeTab === '3d' && (
           <div className="w-full h-full">
             <ThreeTrainViewer
-              vehicle={viewer3DVehicle || vehicles[0]}
+              vehicle={(viewer3DVehicle && vehicles.find((v) => v.id === viewer3DVehicle.id)) || viewer3DVehicle || vehicles[0]}
               onClose={() => setActiveTab('map')}
               lang={lang}
             />
@@ -517,7 +464,7 @@ export default function App() {
 
         {/* TAB 6: SERVICE NOTICES & DISRUPTIONS */}
         {activeTab === 'notices' && (
-          <ServiceNoticesView notices={SERVICE_NOTICES} lang={lang} />
+          <ServiceNoticesView notices={serviceNotices} lang={lang} />
         )}
       </main>
 
@@ -526,7 +473,10 @@ export default function App() {
         landmark={selectedLandmark}
         onClose={() => setSelectedLandmark(null)}
         onViewStation={(stId) => {
-          const st = stationsData.find((s) => s.id === stId);
+          // Landmarks keep legacy ids; fall back to the nearest real TMB metro station.
+          const st =
+            stationsData.find((s) => s.id === stId) ||
+            (selectedLandmark ? network.nearestStation(selectedLandmark.lat, selectedLandmark.lng, { metroOnly: true }) : null);
           if (st) {
             setSelectedStation(st);
             setActiveTab('map');

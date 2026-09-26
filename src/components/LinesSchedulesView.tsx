@@ -22,6 +22,14 @@ export const LinesSchedulesView: React.FC<LinesSchedulesViewProps> = ({
   const [selectedType, setSelectedType] = useState<TransitType | 'all'>('all');
   const [expandedLineId, setExpandedLineId] = useState<string | null>(lines[0]?.id || null);
 
+  const tabs = [
+    { id: 'all', label: t.allVehicles },
+    { id: 'metro', label: t.metro },
+    { id: 'train', label: t.trains },
+    { id: 'bus', label: t.buses },
+    { id: 'tram', label: t.trams }
+  ].filter((tab) => tab.id === 'all' || lines.some((l) => l.type === tab.id));
+
   const filteredLines = lines.filter((l) => {
     if (selectedType === 'all') return true;
     return l.type === selectedType;
@@ -38,20 +46,14 @@ export const LinesSchedulesView: React.FC<LinesSchedulesViewProps> = ({
               <span>{t.linesSchedules}</span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Horarios, frecuencias y recorrido completo de la red metropolitana de Barcelona.
+              Horarios, frecuencias y recorrido completo de la red TMB (GTFS oficial).
             </p>
           </div>
         </div>
 
         {/* Filter Pills */}
         <div className="flex items-center gap-2 overflow-x-auto">
-          {[
-            { id: 'all', label: t.allVehicles },
-            { id: 'metro', label: t.metro },
-            { id: 'train', label: t.trains },
-            { id: 'bus', label: t.buses },
-            { id: 'tram', label: t.trams }
-          ].map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setSelectedType(tab.id as any)}
@@ -89,8 +91,8 @@ export const LinesSchedulesView: React.FC<LinesSchedulesViewProps> = ({
               >
                 <div className="flex items-center gap-3">
                   <span
-                    className="w-10 h-10 rounded-xl flex items-center justify-center font-bold font-mono text-sm text-white shadow-md shrink-0"
-                    style={{ backgroundColor: line.color }}
+                    className="min-w-10 h-10 px-1 rounded-xl flex items-center justify-center font-bold font-mono text-sm shadow-md shrink-0"
+                    style={{ backgroundColor: line.color, color: line.textColor }}
                   >
                     {line.code}
                   </span>
@@ -99,7 +101,9 @@ export const LinesSchedulesView: React.FC<LinesSchedulesViewProps> = ({
                     <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
                       <span>{line.operator}</span>
                       <span>·</span>
-                      <span className="font-mono text-slate-300">Cada {line.frequencyMinutes} min</span>
+                      <span className="font-mono text-slate-300">
+                        {line.frequencyMinutes > 0 ? `${t.everyMin} ${line.frequencyMinutes} ${t.mins}` : '—'}
+                      </span>
                       <span>·</span>
                       <span>{line.stations.length} {t.stopsCount}</span>
                     </div>
@@ -137,7 +141,9 @@ export const LinesSchedulesView: React.FC<LinesSchedulesViewProps> = ({
                   <div className="flex items-center justify-between text-xs text-slate-400">
                     <span className="flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5 text-amber-400" />
-                      <span>{t.operatingHours}</span>
+                      <span>
+                        {line.serviceStart ? `${t.firstLast}: ${line.serviceStart} – ${line.serviceEnd}` : t.operatingHours}
+                      </span>
                     </span>
                     <button
                       onClick={() => onSelectLineOnMap(line)}

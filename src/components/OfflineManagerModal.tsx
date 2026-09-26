@@ -129,19 +129,23 @@ export const OfflineManagerModal: React.FC<OfflineManagerModalProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
                 <span className="text-slate-400">Líneas y Rutas:</span>
-                <span className="font-mono font-bold text-white">Metro L1-L5, Rodalies R1-R4, Bus H12/V15</span>
+                <span className="font-mono font-bold text-white">
+                  {offlineState.isDownloaded ? `${offlineState.cachedLinesCount} líneas TMB` : 'Metro + Bus TMB'}
+                </span>
               </div>
               <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
-                <span className="text-slate-400">Estaciones GPS:</span>
-                <span className="font-mono font-bold text-white">45 Estaciones Clave</span>
+                <span className="text-slate-400">Estaciones y paradas:</span>
+                <span className="font-mono font-bold text-white">
+                  {offlineState.isDownloaded ? offlineState.cachedStationsCount : '—'}
+                </span>
               </div>
               <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
                 <span className="text-slate-400">Lugares de Interés:</span>
-                <span className="font-mono font-bold text-white">12 Monumentos y Parques</span>
+                <span className="font-mono font-bold text-white">{offlineState.cachedLandmarksCount || '—'}</span>
               </div>
               <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
-                <span className="text-slate-400">Horarios y Frecuencias:</span>
-                <span className="font-mono font-bold text-emerald-400">Completos 24/7</span>
+                <span className="text-slate-400">Horarios:</span>
+                <span className="font-mono font-bold text-emerald-400">GTFS oficial completo</span>
               </div>
             </div>
           </div>

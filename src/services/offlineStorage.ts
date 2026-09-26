@@ -1,10 +1,12 @@
-import { TransitLine, Station, PointOfInterest, OfflinePackageState, CustomTripAlert } from '../types/transit';
-import { BARCELONA_LINES, ALL_BARCELONA_STATIONS } from '../data/barcelonaData';
+import { PointOfInterest, OfflinePackageState } from '../types/transit';
 import { BARCELONA_LANDMARKS } from '../data/landmarksData';
+import { NETWORK_URL } from './network/engine';
+import type { RawNetwork } from './network/types';
+
+/** Cache Storage bucket shared with public/sw.js */
+export const OFFLINE_CACHE = 'tmb-network-data';
 
 const STORAGE_KEY_OFFLINE_STATE = 'barnatransit_offline_state';
-const STORAGE_KEY_LINES = 'barnatransit_cached_lines';
-const STORAGE_KEY_STATIONS = 'barnatransit_cached_stations';
 const STORAGE_KEY_LANDMARKS = 'barnatransit_cached_landmarks';
 
 export function getOfflinePackageState(): OfflinePackageState {
@@ -19,7 +21,7 @@ export function getOfflinePackageState(): OfflinePackageState {
 
   return {
     isDownloaded: false,
-    version: '1.2.0-bcn',
+    version: '-',
     sizeBytes: 0,
     cachedStationsCount: 0,
     cachedLinesCount: 0,
@@ -37,77 +39,50 @@ export function saveOfflinePackageState(state: OfflinePackageState) {
 }
 
 /**
- * Downloads and caches all Barcelona routes, stations, schedules and landmarks
+ * Downloads the official TMB network (GTFS: lines, stops, shapes and full timetable)
+ * into Cache Storage so schedules and live positions keep working without connection.
  */
 export async function downloadBarcelonaOfflinePack(
   onProgress: (progressPercent: number) => void
 ): Promise<OfflinePackageState> {
-  const steps = [15, 35, 60, 85, 100];
+  onProgress(2);
+  const res = await fetch(NETWORK_URL, { cache: 'no-cache' });
+  if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
 
-  for (let i = 0; i < steps.length; i++) {
-    await new Promise((res) => setTimeout(res, 220));
-    onProgress(steps[i]);
+  const total = Number(res.headers.get('content-length')) || 0;
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    onProgress(total ? Math.min(95, Math.round((received / total) * 95)) : Math.min(95, 5 + chunks.length));
   }
+  const blob = new Blob(chunks as BlobPart[], { type: 'application/json' });
+  const raw = JSON.parse(await blob.text()) as RawNetwork;
 
-  // Cache data into storage
-  const linesJson = JSON.stringify(BARCELONA_LINES);
-  const stationsJson = JSON.stringify(ALL_BARCELONA_STATIONS);
-  const landmarksJson = JSON.stringify(BARCELONA_LANDMARKS);
-
-  localStorage.setItem(STORAGE_KEY_LINES, linesJson);
-  localStorage.setItem(STORAGE_KEY_STATIONS, stationsJson);
-  localStorage.setItem(STORAGE_KEY_LANDMARKS, landmarksJson);
-
-  // Approximate size calculation
-  const totalBytes =
-    new Blob([linesJson]).size +
-    new Blob([stationsJson]).size +
-    new Blob([landmarksJson]).size +
-    1400000; // includes vector coordinates and geometries
+  if (typeof caches !== 'undefined') {
+    const cache = await caches.open(OFFLINE_CACHE);
+    await cache.put(NETWORK_URL, new Response(blob, { headers: { 'Content-Type': 'application/json' } }));
+  }
+  localStorage.setItem(STORAGE_KEY_LANDMARKS, JSON.stringify(BARCELONA_LANDMARKS));
+  onProgress(100);
 
   const newState: OfflinePackageState = {
     isDownloaded: true,
     downloadDate: Date.now(),
-    version: '2026.09.26-BCN',
-    sizeBytes: totalBytes,
-    cachedStationsCount: ALL_BARCELONA_STATIONS.length,
-    cachedLinesCount: BARCELONA_LINES.length,
+    version: `TMB GTFS ${raw.feed.start}–${raw.feed.end}`,
+    sizeBytes: blob.size,
+    cachedStationsCount: raw.stations.length,
+    cachedLinesCount: raw.routes.length,
     cachedLandmarksCount: BARCELONA_LANDMARKS.length,
     isSimulatedOffline: false
   };
 
   saveOfflinePackageState(newState);
   return newState;
-}
-
-/**
- * Retrieves cached lines if offline or falling back to live data
- */
-export function getCachedLines(): TransitLine[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_LINES);
-    if (raw) {
-      return JSON.parse(raw);
-    }
-  } catch (e) {
-    console.error('Error reading cached lines:', e);
-  }
-  return BARCELONA_LINES;
-}
-
-/**
- * Retrieves cached stations
- */
-export function getCachedStations(): Station[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_STATIONS);
-    if (raw) {
-      return JSON.parse(raw);
-    }
-  } catch (e) {
-    console.error('Error reading cached stations:', e);
-  }
-  return ALL_BARCELONA_STATIONS;
 }
 
 /**
@@ -129,13 +104,12 @@ export function getCachedLandmarks(): PointOfInterest[] {
  * Clears offline cache
  */
 export function clearOfflineCache(): OfflinePackageState {
-  localStorage.removeItem(STORAGE_KEY_LINES);
-  localStorage.removeItem(STORAGE_KEY_STATIONS);
   localStorage.removeItem(STORAGE_KEY_LANDMARKS);
+  if (typeof caches !== 'undefined') void caches.delete(OFFLINE_CACHE);
 
   const resetState: OfflinePackageState = {
     isDownloaded: false,
-    version: '1.2.0-bcn',
+    version: '-',
     sizeBytes: 0,
     cachedStationsCount: 0,
     cachedLinesCount: 0,
