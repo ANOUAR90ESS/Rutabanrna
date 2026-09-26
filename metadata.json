@@ -1,0 +1,6 @@
+{
+  "name": "BarnaTransit 3D - Live Metro, Trains & Buses",
+  "description": "Real-time interactive transit map for Barcelona with live trains, metro, buses, 3D train simulations, and personalized journey alerts in Spanish and English.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

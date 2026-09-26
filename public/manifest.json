@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "BarnaTransit 3D - Metro, Trains & Buses",
+  "short_name": "BarnaTransit",
+  "description": "Real-time interactive transit map for Barcelona with 3D trains, metro, buses, tourist landmarks, and custom offline mode.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
