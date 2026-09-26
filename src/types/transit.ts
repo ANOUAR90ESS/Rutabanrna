@@ -12,6 +12,8 @@ export interface Station {
   hasAccessibleAccess?: boolean;
   hasElevator?: boolean;
   hasBicycleParking?: boolean;
+  isBusStop?: boolean;
+  stopCodes?: string[]; // TMB stop / station codes (used by the iTransit real-time API)
 }
 
 export interface TransitLine {
@@ -27,7 +29,14 @@ export interface TransitLine {
   stations: Station[];
   frequencyMinutes: number;
   pathCoordinates: [number, number][];
+  returnPathCoordinates?: [number, number][];
+  serviceStart?: string; // first departure today "HH:MM"
+  serviceEnd?: string;   // last departure today "HH:MM"
 }
+
+export type Occupancy = 'low' | 'medium' | 'high' | 'unknown';
+
+export type DataSource = 'schedule' | 'realtime';
 
 export interface LiveVehicle {
   id: string;
@@ -43,12 +52,13 @@ export interface LiveVehicle {
   nextStationId: string;
   nextStationName: string;
   etaMinutes: number;
-  occupancy: 'low' | 'medium' | 'high';
+  occupancy: Occupancy;
   delayMinutes: number; // 0 = on time, >0 = delayed
   isDelayed: boolean;
   model: 'civia_train' | 'metro_9000' | 'bus_articulated' | 'tram_citadis';
   progressAlongRoute: number; // 0 to 1
   direction: 'outbound' | 'inbound';
+  source?: DataSource;
 }
 
 export interface Departure {
@@ -61,7 +71,12 @@ export interface Departure {
   isRealTime: boolean;
   delayMinutes: number;
   platform?: string;
-  occupancy: 'low' | 'medium' | 'high';
+  occupancy: Occupancy;
+  lineTextColor?: string;
+  timeEstimateSeconds?: number;
+  departureTime?: string; // "HH:MM" local time
+  isLastOfDay?: boolean;
+  source?: DataSource;
 }
 
 export interface CustomTripAlert {

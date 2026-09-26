@@ -28,13 +28,16 @@ export const LineSelector: React.FC<LineSelectorProps> = ({
 }) => {
   const t = translations[lang];
 
-  const types: { id: TransitType | 'all'; label: string; icon: React.ReactNode }[] = [
+  const allTypes: { id: TransitType | 'all'; label: string; icon: React.ReactNode }[] = [
     { id: 'all', label: t.allVehicles, icon: <Compass className="w-3.5 h-3.5" /> },
     { id: 'metro', label: t.metro, icon: <div className="w-2 h-2 rounded-full bg-red-500" /> },
     { id: 'train', label: t.trains, icon: <Train className="w-3.5 h-3.5" /> },
     { id: 'bus', label: t.buses, icon: <Bus className="w-3.5 h-3.5" /> },
     { id: 'tram', label: t.trams, icon: <div className="w-2 h-2 rounded-full bg-emerald-500" /> }
   ];
+
+  // Only offer the transport modes that exist in the loaded network
+  const types = allTypes.filter((type) => type.id === 'all' || lines.some((l) => l.type === type.id));
 
   const filteredLines = lines.filter((line) => {
     if (selectedType !== 'all' && line.type !== selectedType) return false;
@@ -95,10 +98,10 @@ export const LineSelector: React.FC<LineSelectorProps> = ({
               onClick={() => onSelectLineCode(isSelected ? null : line.code)}
               className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1 shadow-sm whitespace-nowrap ${
                 isSelected
-                  ? 'ring-2 ring-white text-white scale-105'
-                  : 'text-white opacity-85 hover:opacity-100'
+                  ? 'ring-2 ring-white scale-105'
+                  : 'opacity-85 hover:opacity-100'
               }`}
-              style={{ backgroundColor: line.color }}
+              style={{ backgroundColor: line.color, color: line.textColor }}
             >
               <span>{line.code}</span>
             </button>

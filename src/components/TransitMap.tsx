@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { TransitLine, LiveVehicle, Station, TransitType, Language, PointOfInterest } from '../types/transit';
 import { translations } from '../i18n/translations';
 
 interface TransitMapProps {
   lines: TransitLine[];
+  stations: Station[];
   vehicles: LiveVehicle[];
   landmarks: PointOfInterest[];
   showLandmarks: boolean;
@@ -21,8 +22,14 @@ interface TransitMapProps {
   lang: Language;
 }
 
+const esc = (v: string) => v.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+
+/** Bus vehicles/stops are only drawn when zoomed in, filtered to buses, or one line is selected. */
+const BUS_DETAIL_ZOOM = 15;
+
 export const TransitMap: React.FC<TransitMapProps> = ({
   lines,
+  stations,
   vehicles,
   landmarks,
   showLandmarks,
@@ -46,6 +53,9 @@ export const TransitMap: React.FC<TransitMapProps> = ({
   const stationsLayerRef = useRef<L.LayerGroup | null>(null);
   const landmarksLayerRef = useRef<L.LayerGroup | null>(null);
   const vehiclesLayerRef = useRef<L.LayerGroup | null>(null);
+  const vehicleMarkersRef = useRef(new Map<string, { marker: L.Marker; key: string }>());
+  const vehicleDataRef = useRef(new Map<string, LiveVehicle>());
+  const [view, setView] = useState<{ zoom: number; bounds: L.LatLngBounds | null }>({ zoom: 13, bounds: null });
 
   // Initialize Leaflet Map
   useEffect(() => {
@@ -56,8 +66,12 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       center: [41.3879, 2.16992],
       zoom: 13,
       zoomControl: false,
-      attributionControl: false
+      attributionControl: false,
+      preferCanvas: true
     });
+    const syncView = () => setView({ zoom: map.getZoom(), bounds: map.getBounds().pad(0.2) });
+    map.on('moveend zoomend', syncView);
+    syncView();
     mapInstanceRef.current = map;
 
     // Reposition zoom controls
@@ -80,63 +94,97 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     return () => {
       map.remove();
       mapInstanceRef.current = null;
+      vehicleMarkersRef.current.clear();
     };
   }, []);
 
   // Update Line Polylines & Station Markers when lines or filters change
+  const singleLine = lines.length === 1;
+  const busDetail = selectedType === 'bus' || singleLine || view.zoom >= BUS_DETAIL_ZOOM;
   useEffect(() => {
     if (!mapInstanceRef.current || !polylinesLayerRef.current || !stationsLayerRef.current) return;
 
     polylinesLayerRef.current.clearLayers();
     stationsLayerRef.current.clearLayers();
 
+    const q = searchQuery.trim().toLowerCase();
     const filteredLines = lines.filter((line) => {
       if (selectedType !== 'all' && line.type !== selectedType) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
+      if (q) {
         const matchesLine = line.code.toLowerCase().includes(q) || line.name.toLowerCase().includes(q);
         const matchesStation = line.stations.some((st) => st.name.toLowerCase().includes(q));
         return matchesLine || matchesStation;
       }
       return true;
     });
+    const lineCodes = new Set(filteredLines.map((l) => l.code));
+    const emphasiseBus = selectedType === 'bus' || singleLine;
 
-    // Draw route polylines
-    filteredLines.forEach((line) => {
-      // Glow underlay for neon track effect
-      const glowPolyline = L.polyline(line.pathCoordinates, {
-        color: line.color,
-        weight: line.type === 'train' ? 8 : 6,
-        opacity: 0.28,
-        lineCap: 'round',
-        lineJoin: 'round'
+    // Draw route polylines (metro on top of buses)
+    [...filteredLines]
+      .sort((a, b) => (a.type === 'bus' ? 0 : 1) - (b.type === 'bus' ? 0 : 1))
+      .forEach((line) => {
+        const paths = [line.pathCoordinates, line.returnPathCoordinates].filter(
+          (p): p is [number, number][] => !!p && p.length > 1
+        );
+        paths.forEach((path) => {
+          if (line.type === 'bus') {
+            polylinesLayerRef.current?.addLayer(
+              L.polyline(path, {
+                color: line.color,
+                weight: emphasiseBus ? 3 : 2,
+                opacity: emphasiseBus ? 0.85 : 0.22,
+                lineCap: 'round',
+                lineJoin: 'round',
+                interactive: false
+              })
+            );
+            return;
+          }
+          // Glow underlay for neon track effect + sharp central line
+          polylinesLayerRef.current?.addLayer(
+            L.polyline(path, { color: line.color, weight: 8, opacity: 0.28, lineCap: 'round', lineJoin: 'round', interactive: false })
+          );
+          polylinesLayerRef.current?.addLayer(
+            L.polyline(path, { color: line.color, weight: 4, opacity: 0.95, lineCap: 'round', lineJoin: 'round', interactive: false })
+          );
+        });
       });
-      polylinesLayerRef.current?.addLayer(glowPolyline);
 
-      // Sharp central line
-      const mainPolyline = L.polyline(line.pathCoordinates, {
-        color: line.color,
-        weight: line.type === 'train' ? 4 : 3,
-        opacity: 0.95,
-        dashArray: line.type === 'bus' ? '6, 6' : undefined,
-        lineCap: 'round',
-        lineJoin: 'round'
-      });
-      polylinesLayerRef.current?.addLayer(mainPolyline);
-    });
+    const tooltipHtml = (station: Station) => `
+        <div class="font-sans px-1 py-0.5">
+          <div class="font-bold text-xs text-white">${esc(station.name)}</div>
+          <div class="text-[10px] text-slate-400 flex flex-wrap items-center gap-1 mt-0.5">
+            ${station.lines.slice(0, 12).map((l) => `<span class="px-1 py-0.2 rounded bg-slate-800 font-mono text-[9px] text-slate-300">${esc(l)}</span>`).join('')}
+          </div>
+        </div>
+      `;
+    const tooltipOpts: L.TooltipOptions = {
+      direction: 'top',
+      offset: [0, -8],
+      className: 'bg-slate-900 border border-slate-700/80 text-white rounded-lg shadow-xl'
+    };
 
-    // Collect and render unique stations
-    const stationsMap = new Map<string, Station>();
-    filteredLines.forEach((line) => {
-      line.stations.forEach((st) => {
-        if (!stationsMap.has(st.id)) {
-          stationsMap.set(st.id, st);
-        }
-      });
-    });
-
-    stationsMap.forEach((station) => {
+    stations.forEach((station) => {
+      if (!station.lines.some((l) => lineCodes.has(l))) return;
+      if (q && !station.name.toLowerCase().includes(q) && !station.lines.some((l) => l.toLowerCase().includes(q))) return;
       const isSelected = selectedStation?.id === station.id;
+
+      if (station.isBusStop) {
+        if (!busDetail && !isSelected) return;
+        if (!singleLine && selectedType !== 'bus' && view.bounds && !view.bounds.contains([station.lat, station.lng])) return;
+        const dot = L.circleMarker([station.lat, station.lng], {
+          radius: isSelected ? 7 : 4,
+          color: isSelected ? '#fbbf24' : '#e2e8f0',
+          weight: isSelected ? 3 : 1.5,
+          fillColor: '#0f172a',
+          fillOpacity: 1
+        });
+        dot.on('click', () => onSelectStation(station));
+        dot.bindTooltip(tooltipHtml(station), tooltipOpts);
+        stationsLayerRef.current?.addLayer(dot);
+        return;
+      }
 
       // Custom SVG station badge icon
       const iconHtml = `
@@ -156,28 +204,12 @@ export const TransitMap: React.FC<TransitMapProps> = ({
         iconAnchor: [8, 8]
       });
 
-      const marker = L.marker([station.lat, station.lng], { icon: markerIcon });
-
-      marker.on('click', () => {
-        onSelectStation(station);
-      });
-
-      marker.bindTooltip(`
-        <div class="font-sans px-1 py-0.5">
-          <div class="font-bold text-xs text-white">${station.name}</div>
-          <div class="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-            ${station.lines.map((l) => `<span class="px-1 py-0.2 rounded bg-slate-800 font-mono text-[9px] text-slate-300">${l}</span>`).join('')}
-          </div>
-        </div>
-      `, {
-        direction: 'top',
-        offset: [0, -8],
-        className: 'bg-slate-900 border border-slate-700/80 text-white rounded-lg shadow-xl'
-      });
-
+      const marker = L.marker([station.lat, station.lng], { icon: markerIcon, zIndexOffset: 500 });
+      marker.on('click', () => onSelectStation(station));
+      marker.bindTooltip(tooltipHtml(station), tooltipOpts);
       stationsLayerRef.current?.addLayer(marker);
     });
-  }, [lines, selectedType, searchQuery, selectedStation]);
+  }, [lines, stations, selectedType, searchQuery, selectedStation, busDetail, singleLine, view]);
 
   // Update Landmarks Layer
   useEffect(() => {
@@ -227,34 +259,52 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     });
   }, [landmarks, showLandmarks, lang, onSelectLandmark]);
 
-  // Update Moving Live Vehicles
+  // Update Moving Live Vehicles (markers are reused and only moved each tick)
   useEffect(() => {
-    if (!mapInstanceRef.current || !vehiclesLayerRef.current) return;
+    const layer = vehiclesLayerRef.current;
+    if (!mapInstanceRef.current || !layer) return;
 
-    vehiclesLayerRef.current.clearLayers();
-
-    const filteredVehicles = vehicles.filter((v) => {
+    const q = searchQuery.trim().toLowerCase();
+    const lineCodes = new Set(lines.map((l) => l.code));
+    const visible = vehicles.filter((v) => {
+      if (!lineCodes.has(v.lineCode)) return false;
       if (selectedType !== 'all' && v.type !== selectedType) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
+      if (q) {
         return (
           v.lineCode.toLowerCase().includes(q) ||
           v.destination.toLowerCase().includes(q) ||
           v.nextStationName.toLowerCase().includes(q)
         );
       }
+      if (v.type === 'bus' && !busDetail) return false;
+      if (v.type === 'bus' && !singleLine && selectedType !== 'bus' && view.bounds && !view.bounds.contains([v.lat, v.lng])) return false;
       return true;
     });
 
-    filteredVehicles.forEach((vehicle) => {
-      const vehicleHtml = `
-        <div class="relative cursor-pointer transition-transform duration-300 hover:scale-110">
-          <!-- Radar pulse ring for live movement -->
-          <div class="absolute -inset-2 rounded-full opacity-60 animate-radar" style="background-color: ${vehicle.color}"></div>
+    const markers = vehicleMarkersRef.current;
+    const data = vehicleDataRef.current;
+    data.clear();
+    const seen = new Set<string>();
 
-          <!-- Vehicle body container -->
+    visible.forEach((vehicle) => {
+      seen.add(vehicle.id);
+      data.set(vehicle.id, vehicle);
+      const isBus = vehicle.type === 'bus';
+      const key = `${vehicle.lineCode}|${vehicle.isDelayed}`;
+      const existing = markers.get(vehicle.id);
+      if (existing) {
+        existing.marker.setLatLng([vehicle.lat, vehicle.lng]);
+        if (existing.key === key) return;
+        layer.removeLayer(existing.marker);
+      }
+
+      const vehicleHtml = isBus
+        ? `<div class="relative cursor-pointer flex items-center justify-center px-1 rounded shadow-lg text-white font-bold font-mono text-[9px] border border-white/50" style="background-color:${vehicle.color}">${esc(vehicle.lineCode)}</div>`
+        : `
+        <div class="relative cursor-pointer transition-transform duration-300 hover:scale-110">
+          <div class="absolute -inset-2 rounded-full opacity-60 animate-radar" style="background-color: ${vehicle.color}"></div>
           <div class="relative flex items-center justify-center px-1.5 py-0.5 rounded-md shadow-xl text-white font-bold font-mono text-[11px] border border-white/40" style="background-color: ${vehicle.color}">
-            <span>${vehicle.lineCode}</span>
+            <span>${esc(vehicle.lineCode)}</span>
             <div class="ml-1 w-1.5 h-1.5 rounded-full ${vehicle.isDelayed ? 'bg-amber-300' : 'bg-emerald-300'}"></div>
           </div>
         </div>
@@ -263,59 +313,61 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       const vehicleIcon = L.divIcon({
         className: 'vehicle-div-icon',
         html: vehicleHtml,
-        iconSize: [36, 22],
-        iconAnchor: [18, 11]
+        iconSize: isBus ? [30, 14] : [36, 22],
+        iconAnchor: isBus ? [15, 7] : [18, 11]
       });
 
-      const marker = L.marker([vehicle.lat, vehicle.lng], { icon: vehicleIcon });
-
+      const marker = L.marker([vehicle.lat, vehicle.lng], { icon: vehicleIcon, zIndexOffset: isBus ? 800 : 1000 });
+      const id = vehicle.id;
       marker.on('click', () => {
-        onSelectVehicle(vehicle);
+        const v = vehicleDataRef.current.get(id);
+        if (v) onSelectVehicle(v);
       });
 
-      // Rich popup with 3D button
-      const popupContent = document.createElement('div');
-      popupContent.className = 'p-3 w-64 text-left';
-      popupContent.innerHTML = `
+      // Rich popup with 3D button (content built from the latest data when opened)
+      marker.bindPopup(() => {
+        const v = vehicleDataRef.current.get(id) || vehicle;
+        const popupContent = document.createElement('div');
+        popupContent.className = 'p-3 w-64 text-left';
+        popupContent.innerHTML = `
         <div class="flex items-center justify-between pb-2 border-b border-slate-700/60">
           <div class="flex items-center gap-2">
-            <span class="px-2 py-0.5 rounded text-xs font-bold text-white" style="background-color: ${vehicle.color}">${vehicle.lineCode}</span>
-            <span class="text-xs font-bold text-white capitalize">${vehicle.type}</span>
+            <span class="px-2 py-0.5 rounded text-xs font-bold text-white" style="background-color: ${v.color}">${esc(v.lineCode)}</span>
+            <span class="text-xs font-bold text-white capitalize">${v.type}</span>
           </div>
-          <span class="text-[10px] px-1.5 py-0.5 rounded font-mono ${vehicle.isDelayed ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}">
-            ${vehicle.isDelayed ? `+${vehicle.delayMinutes}m retard` : 'En hora'}
+          <span class="text-[10px] px-1.5 py-0.5 rounded font-mono ${v.isDelayed ? 'bg-amber-500/20 text-amber-300' : 'bg-sky-500/20 text-sky-300'}">
+            ${v.isDelayed ? `+${v.delayMinutes}m` : esc(t.sourceSchedule)}
           </span>
         </div>
 
         <div class="py-2 space-y-1 text-xs">
-          <div class="text-slate-400">Destino: <strong class="text-slate-200">${vehicle.destination}</strong></div>
-          <div class="text-slate-400">Próxima parada: <strong class="text-slate-200">${vehicle.nextStationName}</strong></div>
+          <div class="text-slate-400">${esc(t.destination)}: <strong class="text-slate-200">${esc(v.destination)}</strong></div>
+          <div class="text-slate-400">${esc(t.nextStop)}: <strong class="text-slate-200">${esc(v.nextStationName)}</strong></div>
           <div class="flex items-center justify-between pt-1">
-            <span class="text-slate-400 font-mono">Velocidad: <strong class="text-white">${vehicle.speedKmH} km/h</strong></span>
-            <span class="text-slate-400 font-mono">ETA: <strong class="text-white">${vehicle.etaMinutes} min</strong></span>
+            <span class="text-slate-400 font-mono">${esc(t.speed)}: <strong class="text-white">${v.speedKmH} km/h</strong></span>
+            <span class="text-slate-400 font-mono">ETA: <strong class="text-white">${v.etaMinutes < 1 ? '&lt;1' : v.etaMinutes} min</strong></span>
           </div>
         </div>
-
-        <button id="btn-view-3d-${vehicle.id}" class="w-full mt-2 py-1.5 px-3 rounded-lg bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md">
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-          <span>${t.inspect3D}</span>
-        </button>
       `;
+        const btn = document.createElement('button');
+        btn.className = 'w-full mt-2 py-1.5 px-3 rounded-lg bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md';
+        btn.innerHTML = `<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg><span>${esc(t.inspect3D)}</span>`;
+        btn.onclick = () => onOpen3DViewer(vehicleDataRef.current.get(id) || v);
+        popupContent.appendChild(btn);
+        return popupContent;
+      }, { maxWidth: 280 });
 
-      marker.bindPopup(popupContent, { maxWidth: 280 });
-
-      marker.on('popupopen', () => {
-        const btn3d = document.getElementById(`btn-view-3d-${vehicle.id}`);
-        if (btn3d) {
-          btn3d.onclick = () => {
-            onOpen3DViewer(vehicle);
-          };
-        }
-      });
-
-      vehiclesLayerRef.current?.addLayer(marker);
+      layer.addLayer(marker);
+      markers.set(vehicle.id, { marker, key });
     });
-  }, [vehicles, selectedType, searchQuery, selectedVehicle, t.inspect3D]);
+
+    markers.forEach((entry, id) => {
+      if (!seen.has(id)) {
+        layer.removeLayer(entry.marker);
+        markers.delete(id);
+      }
+    });
+  }, [vehicles, lines, selectedType, searchQuery, busDetail, singleLine, view, t]);
 
   // Pan to selected station or vehicle
   useEffect(() => {

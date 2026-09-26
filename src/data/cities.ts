@@ -13,7 +13,7 @@ export const CITIES: City[] = [
     center: [41.3879, 2.16992],
     zoom: 13,
     status: 'active',
-    systems: ['Metro TMB', 'Rodalies Renfe', 'FGC', 'Bus TMB', 'TRAM']
+    systems: ['Metro TMB', 'Bus TMB', 'Funicular de Montjuïc']
   },
   {
     id: 'madrid',
