@@ -142,14 +142,23 @@ const routes = routesCsv.map((r) => ({
 
 // Elevators per metro station code (TMB open data "accessos_estacio_linia")
 const elevators = new Map();
-const accessibleAccess = new Map();
+const accessesByCode = new Map(); // station code -> [{c, n, lat, lon, a, e}]
 if (fs.existsSync(ACCESS_SRC)) {
   const acc = JSON.parse(fs.readFileSync(ACCESS_SRC, 'utf8'));
   for (const f of acc.features) {
     const p = f.properties;
     const code = String(p.CODI_ESTACIO);
     elevators.set(code, (elevators.get(code) || 0) + (p.NUM_ASCENSORS || 0));
-    if (p.ID_TIPUS_ACCESSIBILITAT === 1) accessibleAccess.set(code, (accessibleAccess.get(code) || 0) + 1);
+    if (!accessesByCode.has(code)) accessesByCode.set(code, []);
+    const [lon, lat] = f.geometry.coordinates;
+    accessesByCode.get(code).push({
+      c: String(p.CODI_ACCES),
+      n: p.NOM_ACCES,
+      lat: +lat.toFixed(6),
+      lon: +lon.toFixed(6),
+      a: p.ID_TIPUS_ACCESSIBILITAT === 1 ? 1 : 0,
+      e: p.NUM_ASCENSORS || 0
+    });
   }
 }
 const elevatorPathways = new Map();
@@ -382,7 +391,14 @@ const out = {
   feed: { publisher: feedInfo.feed_publisher_name || 'TMB', version: feedInfo.feed_version || '', start: feedStart, end: feedEnd },
   generated: new Date().toISOString(),
   routes,
-  stations: stations.map((s) => ({ n: s.n, lat: s.lat, lon: s.lon, b: s.b, s: s.s, r: s.r })),
+  stations: stations.map((s) => {
+    const o = { n: s.n, lat: s.lat, lon: s.lon, b: s.b, s: s.s, r: s.r };
+    // Street entrances (TMB open data): [name, lat, lon, accessible 0/1, elevators], shared ones de-duplicated
+    const seen = new Map();
+    for (const si of s.s) for (const a of accessesByCode.get(stops[si].c) || []) if (!seen.has(a.c)) seen.set(a.c, a);
+    if (seen.size) o.ac = [...seen.values()].sort((x, y) => y.a - x.a || x.n.localeCompare(y.n)).map((a) => [a.n, a.lat, a.lon, a.a, a.e]);
+    return o;
+  }),
   stops: stops.map((s) => ({ id: s.id, c: s.c, g: s.g, lat: +s.lat.toFixed(6), lon: +s.lon.toFixed(6), w: s.w, e: s.e, r: s.r })),
   shapes: outShapes,
   patterns,

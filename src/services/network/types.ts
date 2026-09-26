@@ -18,6 +18,7 @@ export interface RawStation {
   b: 0 | 1;           // 1 = bus stop
   s: number[];        // indices into stops (platforms of this station)
   r: number[];        // routes serving the station
+  ac?: [string, number, number, 0 | 1, number][]; // entrances: name, lat, lon, accessible, elevators
 }
 
 export interface RawStop {

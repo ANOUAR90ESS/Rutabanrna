@@ -2,6 +2,14 @@ export type TransitType = 'metro' | 'train' | 'bus' | 'tram';
 
 export type Language = 'es' | 'en' | 'ar' | 'ca';
 
+export interface StationAccess {
+  name: string;
+  lat: number;
+  lng: number;
+  accessible: boolean;
+  elevators: number;
+}
+
 export interface Station {
   id: string;
   name: string;
@@ -14,6 +22,7 @@ export interface Station {
   hasBicycleParking?: boolean;
   isBusStop?: boolean;
   stopCodes?: string[]; // TMB stop / station codes (used by the iTransit real-time API)
+  accesses?: StationAccess[]; // street entrances (TMB open data)
 }
 
 export interface TransitLine {

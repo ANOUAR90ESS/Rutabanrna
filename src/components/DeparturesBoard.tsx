@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Bell, Clock, Radio } from 'lucide-react';
+import { X, Bell, Clock, Radio, DoorOpen, Accessibility, ChevronDown, Navigation } from 'lucide-react';
 import { Station, TransitLine, LiveVehicle, Language, Departure } from '../types/transit';
 import { translations } from '../i18n/translations';
 import type { TmbNetwork } from '../services/network/engine';
@@ -32,6 +32,8 @@ export const DeparturesBoard: React.FC<DeparturesBoardProps> = ({
 }) => {
   const t = translations[lang];
   const [live, setLive] = useState<{ at: number; deps: Departure[] } | null>(null);
+  const [showAccesses, setShowAccesses] = useState(false);
+  const [onlyAccessible, setOnlyAccessible] = useState(false);
 
   // Optional TMB iTransit predictions (only when API keys are configured)
   useEffect(() => {
@@ -68,7 +70,7 @@ export const DeparturesBoard: React.FC<DeparturesBoardProps> = ({
   const vehicleById = new Map(vehicles.map((v) => [v.id, v]));
 
   return (
-    <div className="absolute top-44 left-4 z-30 w-[calc(100%-2rem)] sm:w-96 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden animate-fadeIn">
+    <div className="absolute top-44 left-4 z-30 w-[calc(100%-2rem)] sm:w-96 max-h-[calc(100%-12rem)] overflow-y-auto bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl shadow-2xl animate-fadeIn">
       {/* Station Header */}
       <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-start justify-between">
         <div className="min-w-0">
@@ -195,6 +197,74 @@ export const DeparturesBoard: React.FC<DeparturesBoardProps> = ({
           );
         })}
       </div>
+
+      {/* Street entrances (TMB open data) */}
+      {station.accesses && station.accesses.length > 0 && (
+        <div className="border-t border-slate-800">
+          <button
+            onClick={() => setShowAccesses(!showAccesses)}
+            className="w-full px-4 py-2.5 flex items-center justify-between text-[11px] font-bold text-slate-300 uppercase tracking-wider hover:bg-slate-800/40"
+          >
+            <span className="flex items-center gap-1.5">
+              <DoorOpen className="w-3.5 h-3.5 text-amber-400" />
+              {t.entrances} ({station.accesses.length})
+              <span className="normal-case font-semibold text-sky-300">
+                · {station.accesses.filter((a) => a.accessible).length} {t.accessibleEntrance.toLowerCase()}
+              </span>
+            </span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${showAccesses ? 'rotate-180' : ''}`} />
+          </button>
+          {showAccesses && (
+            <div className="px-3 pb-3 space-y-1.5 max-h-56 overflow-y-auto">
+              <label className="flex items-center gap-2 px-1 text-[11px] text-slate-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={onlyAccessible}
+                  onChange={(e) => setOnlyAccessible(e.target.checked)}
+                  className="accent-sky-500"
+                />
+                {t.onlyAccessible}
+              </label>
+              {station.accesses
+                .filter((a) => !onlyAccessible || a.accessible)
+                .map((a) => (
+                  <div
+                    key={`${a.name}-${a.lat}`}
+                    className="p-2 rounded-lg bg-slate-950/70 border border-slate-800/80 flex items-center justify-between gap-2"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-white truncate">{a.name}</div>
+                      <div className="text-[10px] flex items-center gap-1.5">
+                        {a.accessible ? (
+                          <span className="text-sky-300 flex items-center gap-1">
+                            <Accessibility className="w-3 h-3" />
+                            {t.accessibleEntrance}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">{t.notAccessibleEntrance}</span>
+                        )}
+                        {a.elevators > 0 && (
+                          <span className="text-emerald-400">
+                            · {a.elevators} {t.elevatorShort}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${a.lat},${a.lng}&travelmode=walking`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={t.directions}
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0"
+                    >
+                      <Navigation className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Footer: Quick Alert Trigger */}
       <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between">

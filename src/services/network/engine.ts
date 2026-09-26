@@ -124,9 +124,10 @@ export class TmbNetwork {
         lng: st.lon,
         lines: st.r.map((r) => raw.routes[r].n),
         hasAccessibleAccess: stops.every((s) => s.w === 1),
-        hasElevator: stops.some((s) => s.e > 0),
+        hasElevator: st.ac ? st.ac.some((a) => a[4] > 0) : stops.some((s) => s.e > 0),
         isBusStop: st.b === 1,
-        stopCodes: stops.map((s) => s.c)
+        stopCodes: stops.map((s) => s.c),
+        accesses: st.ac?.map(([name, lat, lng, a, e]) => ({ name, lat, lng, accessible: a === 1, elevators: e }))
       };
     });
     this.stations.forEach((s, i) => this.stationById.set(s.id, i));

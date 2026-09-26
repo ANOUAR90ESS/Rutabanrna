@@ -209,7 +209,26 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       marker.bindTooltip(tooltipHtml(station), tooltipOpts);
       stationsLayerRef.current?.addLayer(marker);
     });
-  }, [lines, stations, selectedType, searchQuery, selectedStation, busDetail, singleLine, view]);
+
+    // Street entrances of the selected station (blue = step-free, grey = stairs only)
+    selectedStation?.accesses?.forEach((acc) => {
+      const dot = L.circleMarker([acc.lat, acc.lng], {
+        radius: 6,
+        color: '#ffffff',
+        weight: 2,
+        fillColor: acc.accessible ? '#0ea5e9' : '#64748b',
+        fillOpacity: 1
+      });
+      dot.bindTooltip(
+        `<div class="font-sans px-1 py-0.5"><div class="font-bold text-xs text-white">${esc(acc.name)}</div>` +
+          `<div class="text-[10px] ${acc.accessible ? 'text-sky-300' : 'text-slate-400'}">${esc(
+            acc.accessible ? t.accessibleEntrance : t.notAccessibleEntrance
+          )}${acc.elevators ? ` · ${acc.elevators} ${esc(t.elevatorShort)}` : ''}</div></div>`,
+        tooltipOpts
+      );
+      stationsLayerRef.current?.addLayer(dot);
+    });
+  }, [lines, stations, selectedType, searchQuery, selectedStation, busDetail, singleLine, view, t]);
 
   // Update Landmarks Layer
   useEffect(() => {

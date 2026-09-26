@@ -115,7 +115,13 @@ export const translations = {
     station: 'Estación',
     setAlertHere: 'Configurar aviso para esta estación',
     departsAt: 'Sale a las',
-    now: 'Ahora'
+    now: 'Ahora',
+    entrances: 'Accesos',
+    accessibleEntrance: 'Accesible',
+    notAccessibleEntrance: 'No accesible',
+    elevatorShort: 'ascensor',
+    directions: 'Cómo llegar',
+    onlyAccessible: 'Solo accesibles'
   },
   en: {
     appTitle: 'BarnaTransit 3D',
@@ -231,7 +237,13 @@ export const translations = {
     station: 'Station',
     setAlertHere: 'Set an alert for this station',
     departsAt: 'Departs at',
-    now: 'Now'
+    now: 'Now',
+    entrances: 'Entrances',
+    accessibleEntrance: 'Step-free',
+    notAccessibleEntrance: 'Not step-free',
+    elevatorShort: 'lift',
+    directions: 'Directions',
+    onlyAccessible: 'Step-free only'
   },
   ca: {
     appTitle: 'BarnaTransit 3D',
@@ -347,7 +359,13 @@ export const translations = {
     station: 'Estació',
     setAlertHere: 'Configura un avís per a aquesta estació',
     departsAt: 'Surt a les',
-    now: 'Ara'
+    now: 'Ara',
+    entrances: 'Accessos',
+    accessibleEntrance: 'Accessible',
+    notAccessibleEntrance: 'No accessible',
+    elevatorShort: 'ascensor',
+    directions: 'Com arribar-hi',
+    onlyAccessible: 'Només accessibles'
   },
   ar: {
     appTitle: 'بارناترانزيت 3D',
@@ -463,6 +481,12 @@ export const translations = {
     station: 'محطة',
     setAlertHere: 'إنشاء تنبيه لهذه المحطة',
     departsAt: 'ينطلق الساعة',
-    now: 'الآن'
+    now: 'الآن',
+    entrances: 'المداخل',
+    accessibleEntrance: 'مهيّأ لذوي الإعاقة',
+    notAccessibleEntrance: 'غير مهيّأ',
+    elevatorShort: 'مصعد',
+    directions: 'الاتجاهات',
+    onlyAccessible: 'المهيّأة فقط'
   }
 };
