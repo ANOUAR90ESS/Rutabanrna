@@ -12,7 +12,6 @@ interface DeparturesBoardProps {
   lines: TransitLine[];
   vehicles: LiveVehicle[];
   onClose: () => void;
-  onOpen3DViewer: (vehicle: LiveVehicle) => void;
   onOpen3DStation?: (station: Station) => void;
   onCreateAlertForStation: (station: Station, lineCode: string) => void;
   lang: Language;

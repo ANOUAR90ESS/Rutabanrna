@@ -44,7 +44,16 @@ export const LastTrainCard: React.FC<{
       const ymd = deadline > 86400 ? ymdShift(c.ymd, 1) : c.ymd;
       morning = router.earliest(ymd, origins, END_OF_NIGHT, dests, o);
     }
-    return { last, morning, deadline, secs: c.secs };
+    // Continuous service (e.g. Saturday night): trains keep reaching home right after the cut-off
+    // (no night gap between the "last" journey and the next one)
+    let after = last ? router.earliest(c.ymd, origins, last.dep + 60, dests, o) : null;
+    if (last && !after && last.dep >= 86400 - 3600) {
+      // trips after the cut-off belong to the next service day
+      after = router.earliest(ymdShift(c.ymd, 1), origins, Math.max(0, last.dep + 60 - 86400), dests, o);
+      if (after) after = { ...after, dep: after.dep + 86400 };
+    }
+    const continuous = !!last && !!after && after.dep - last.dep < 40 * 60;
+    return { last, morning, deadline, secs: c.secs, continuous };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [network, router, home?.id, posKey, minute]);
 
@@ -52,10 +61,10 @@ export const LastTrainCard: React.FC<{
   if (geo.status !== 'ok') return null;
   if (!res) return null;
 
-  const { last, morning, deadline, secs } = res;
+  const { last, morning, deadline, secs, continuous } = res;
   const rides = (last?.legs ?? []).filter((l): l is Extract<Leg, { kind: 'ride' }> => l.kind === 'ride');
   const left = last ? last.dep - secs : 0;
-  const allNight = last && last.dep >= deadline - 1800;
+  const allNight = last && (continuous || last.dep >= deadline - 1800);
   const urgent = last && left < 20 * 60;
   const hm = (s: number) => (s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min` : `${Math.max(0, Math.floor(s / 60))} min`);
 
@@ -78,7 +87,7 @@ export const LastTrainCard: React.FC<{
             <div className={`text-xs font-semibold ${urgent ? 'text-amber-300' : 'text-indigo-200'}`}>{fmt(t.lastLeft, hm(left))}</div>
           </>
         )}
-        {last && (
+        {last && !allNight && (
           <div className="flex items-center gap-1 mt-1.5 flex-wrap">
             {rides.map((r, i) => (
               <React.Fragment key={i}>

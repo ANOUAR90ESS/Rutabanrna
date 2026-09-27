@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { TopNav, BottomNav } from './components/TopNav';
 import { NowView } from './components/now/NowView';
 import { TripPlanner, TripRequest } from './components/trip/TripPlanner';
@@ -7,11 +7,11 @@ import { LastTrainCard } from './components/now/LastTrainCard';
 import { useFavorites, useGeolocation } from './hooks/useUserContext';
 import { Router, Journey, journeyGeometry, JourneySegment } from './services/network/router';
 import { TransitMap } from './components/TransitMap';
-import { Station3DView } from './components/station3d/Station3DView';
+// three.js is heavy: the 3D station view is loaded on demand
+const Station3DView = lazy(() => import('./components/station3d/Station3DView').then((m) => ({ default: m.Station3DView })));
 import { LineSelector } from './components/LineSelector';
 import { DeparturesBoard } from './components/DeparturesBoard';
 import { LiveAlertsBanner } from './components/LiveAlertsBanner';
-import { CitySwitcherModal } from './components/CitySwitcherModal';
 import { LinesSchedulesView } from './components/LinesSchedulesView';
 import { ServiceNoticesView } from './components/ServiceNoticesView';
 import { LandmarkDetailsModal } from './components/LandmarkDetailsModal';
@@ -22,14 +22,12 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 import { BARCELONA_LANDMARKS } from './data/landmarksData';
 import { useNow, useTmbNetwork } from './hooks/useTmbNetwork';
 import { NetworkLoadingScreen } from './components/NetworkLoadingScreen';
-import { CITIES } from './data/cities';
 import {
   TransitType,
   TransitLine,
   LiveVehicle,
   Station,
   Language,
-  City,
   PointOfInterest,
   OfflinePackageState,
   AppTab,
@@ -66,8 +64,6 @@ export default function App() {
   const router = useMemo(() => (network ? new Router(network) : null), [network]);
   const [tripRequest, setTripRequest] = useState<TripRequest | null>(null);
   const [mapJourney, setMapJourney] = useState<{ segments: JourneySegment[]; lineCodes: string[] } | null>(null);
-  const [selectedCity, setSelectedCity] = useState<City>(CITIES[0]);
-  const [isCityModalOpen, setIsCityModalOpen] = useState<boolean>(false);
 
   // Filters & Search
   const [selectedType, setSelectedType] = useState<TransitType | 'all'>('all');
@@ -230,8 +226,6 @@ export default function App() {
         setActiveTab={setActiveTab}
         lang={lang}
         setLang={setLang}
-        currentCityName={selectedCity.name[lang]}
-        onOpenCityModal={() => setIsCityModalOpen(true)}
         onOpenNewAlert={() => openAlertDraft({})}
         onOpenOfflineManager={() => setIsOfflineModalOpen(true)}
         activeAlertsCount={enabledAlerts}
@@ -340,7 +334,6 @@ export default function App() {
               lines={linesData}
               vehicles={vehicles}
               onClose={() => setSelectedStation(null)}
-              onOpen3DViewer={handleOpen3DViewer}
               onCreateAlertForStation={handleCreateAlertForStation}
               onOpen3DStation={open3DStation}
               lang={lang}
@@ -349,9 +342,6 @@ export default function App() {
             {/* Live Service Notice Ticker */}
             <LiveAlertsBanner
               notices={serviceNotices}
-              activeTripAlarm={null}
-              onDismissAlarm={() => undefined}
-              onOpen3DViewerForLine={handleOpen3DViewerForLine}
               lang={lang}
             />
 
@@ -365,7 +355,9 @@ export default function App() {
 
         {/* TAB 2: FULL-SCREEN 3D TRAIN & METRO VIEWER */}
         {activeTab === '3d' && (
-          <Station3DView network={network} station={station3D} vehicles={vehicles} now={now} lang={lang} onPickStation={(s) => setStation3D(s)} />
+          <Suspense fallback={<div className="w-full h-full bg-slate-950" />}>
+            <Station3DView network={network} station={station3D} vehicles={vehicles} now={now} lang={lang} onPickStation={(s) => setStation3D(s)} />
+          </Suspense>
         )}
 
         {/* TAB 3: BARCELONA TOURIST ATTRACTIONS & LANDMARKS */}
@@ -465,14 +457,7 @@ export default function App() {
 
 
 
-      {/* Modal: City Switcher (Barcelona -> Madrid / Valencia / Sevilla) */}
-      <CitySwitcherModal
-        isOpen={isCityModalOpen}
-        onClose={() => setIsCityModalOpen(false)}
-        selectedCity={selectedCity}
-        onSelectCity={(city) => setSelectedCity(city)}
-        lang={lang}
-      />
+
     </div>
   );
 }

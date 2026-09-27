@@ -2,7 +2,7 @@ import { Language } from '../types/transit';
 
 export const translations = {
   es: {
-    appTitle: 'BarnaTransit 3D',
+    appTitle: 'BarnaTransit',
     appSubtitle: 'Transporte en Tiempo Real · Barcelona',
     searchPlaceholder: 'Buscar línea, estación o parada...',
     liveMap: 'Mapa en Vivo',
@@ -124,7 +124,7 @@ export const translations = {
     onlyAccessible: 'Solo accesibles'
   },
   en: {
-    appTitle: 'BarnaTransit 3D',
+    appTitle: 'BarnaTransit',
     appSubtitle: 'Real-Time Transit · Barcelona',
     searchPlaceholder: 'Search line, station or stop...',
     liveMap: 'Live Map',
@@ -246,7 +246,7 @@ export const translations = {
     onlyAccessible: 'Step-free only'
   },
   ca: {
-    appTitle: 'BarnaTransit 3D',
+    appTitle: 'BarnaTransit',
     appSubtitle: 'Transport en Temps Real · Barcelona',
     searchPlaceholder: 'Cerca línia, estació o parada...',
     liveMap: 'Mapa en Viu',

@@ -80,8 +80,6 @@ interface TopNavProps {
   setActiveTab: (tab: AppTab) => void;
   lang: Language;
   setLang: (lang: Language) => void;
-  currentCityName: string;
-  onOpenCityModal: () => void;
   onOpenNewAlert: () => void;
   onOpenOfflineManager: () => void;
   activeAlertsCount: number;
@@ -94,8 +92,6 @@ export const TopNav: React.FC<TopNavProps> = ({
   setActiveTab,
   lang,
   setLang,
-  currentCityName,
-  onOpenCityModal,
   onOpenNewAlert,
   onOpenOfflineManager,
   activeAlertsCount,
@@ -121,20 +117,12 @@ export const TopNav: React.FC<TopNavProps> = ({
               <Train className="w-4 h-4 text-amber-400" />
             </div>
           </div>
-          <span className="font-tech tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-slate-400">
+          <span className="hidden sm:inline font-tech tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-slate-400">
             {t.appTitle}
           </span>
         </a>
 
-        {/* City Switcher Trigger */}
-        <button
-          onClick={onOpenCityModal}
-          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs font-semibold text-slate-300 hover:text-white transition-all shadow-sm"
-        >
-          <MapPin className="w-3 h-3 text-rose-400" />
-          <span className="max-w-[80px] truncate">{currentCityName}</span>
-          <span className="text-[10px] text-emerald-400 ml-0.5 font-mono">LIVE</span>
-        </button>
+
       </div>
 
       {/* Zone 2: 4-6 Clean Text Nav Links with Active Indicator */}
@@ -189,10 +177,10 @@ export const TopNav: React.FC<TopNavProps> = ({
             onChange={(e) => setLang(e.target.value as Language)}
             className="bg-transparent text-xs font-semibold text-slate-200 pr-2 py-1 outline-none cursor-pointer"
           >
-            <option value="es" className="bg-slate-900 text-white">Español (ES)</option>
-            <option value="en" className="bg-slate-900 text-white">English (EN)</option>
-            <option value="ca" className="bg-slate-900 text-white">Català (CA)</option>
-            <option value="ar" className="bg-slate-900 text-white">العربية (AR)</option>
+            <option value="es" className="bg-slate-900 text-white">ES</option>
+            <option value="en" className="bg-slate-900 text-white">EN</option>
+            <option value="ca" className="bg-slate-900 text-white">CA</option>
+            <option value="ar" className="bg-slate-900 text-white">AR</option>
           </select>
         </div>
 

@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "BarnaTransit 3D - Metro, Trains & Buses",
+  "name": "BarnaTransit — Metro y Bus TMB",
   "short_name": "BarnaTransit",
-  "description": "Real-time interactive transit map for Barcelona with 3D trains, metro, buses, tourist landmarks, and custom offline mode.",
+  "description": "Próximas salidas, rutas sin escaleras, último tren a casa y avisos para salir con el horario oficial de TMB.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
