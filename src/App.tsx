@@ -7,6 +7,7 @@ import { LastTrainCard } from './components/now/LastTrainCard';
 import { DataAttribution, DataStatusBanner } from './components/legal/DataAttribution';
 import { AboutView } from './components/legal/AboutView';
 import { fmt, ui } from './i18n/ui';
+import { useNativeShell } from './native/useNativeShell';
 import { useFavorites, useGeolocation } from './hooks/useUserContext';
 import { Router, Journey, journeyGeometry, JourneySegment } from './services/network/router';
 import { TransitMap } from './components/TransitMap';
@@ -120,6 +121,22 @@ export default function App() {
   };
   const enabledAlerts = departureAlerts.alerts.filter((a) => a.enabled).length;
 
+  // Android app: back button, status bar, native "leave now" notifications
+  const nativeShell = useNativeShell({
+    network,
+    alerts: departureAlerts.alerts,
+    lang,
+    activeTab,
+    setActiveTab,
+    onBack: () => {
+      if (selectedStation) {
+        setSelectedStation(null);
+        return true;
+      }
+      return false;
+    }
+  });
+
   // Online / Offline browser event tracking
   useEffect(() => {
     const handleOnline = () => setIsBrowserOnline(true);
@@ -222,7 +239,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 text-slate-100">
+    <div className="flex flex-col h-[100dvh] w-screen overflow-hidden bg-slate-950 text-slate-100">
       {/* Universal Top Navigation */}
       <TopNav
         activeTab={activeTab}
@@ -237,7 +254,7 @@ export default function App() {
       />
 
       {/* Main View Area */}
-      <main className="relative flex-1 w-full h-[calc(100vh-4rem)] overflow-hidden pb-16 lg:pb-0">
+      <main className="relative flex-1 min-h-0 w-full overflow-hidden pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
         {/* TAB: NOW (home) */}
         {activeTab === 'now' && (
           <NowView
@@ -414,6 +431,7 @@ export default function App() {
             onAdd={departureAlerts.addAlert}
             onRemove={departureAlerts.removeAlert}
             onToggle={departureAlerts.toggleAlert}
+            onPermissionChange={nativeShell.resync}
           />
         )}
 

@@ -11,7 +11,10 @@ createRoot(document.getElementById('root')!).render(
 );
 
 // Offline support (timetable + app shell). Only in production builds to keep dev HMR simple.
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+import { Capacitor } from '@capacitor/core';
+
+// (not in the Android app: its assets and timetable are bundled in the APK)
+if (import.meta.env.PROD && 'serviceWorker' in navigator && !Capacitor.isNativePlatform()) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => undefined);
   });

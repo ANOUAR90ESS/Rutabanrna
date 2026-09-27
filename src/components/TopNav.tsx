@@ -53,7 +53,7 @@ export const BottomNav: React.FC<{ activeTab: AppTab; setActiveTab: (t: AppTab) 
           </div>
         </div>
       )}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 h-16 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 grid grid-cols-5 pb-[env(safe-area-inset-bottom)]">
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 h-16 box-content bg-slate-950/95 backdrop-blur-md border-t border-slate-800 grid grid-cols-5 pb-[env(safe-area-inset-bottom)]">
         {primary.map((i) => (
           <button
             key={i.id}
@@ -102,7 +102,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   const t = translations[lang];
 
   return (
-    <header className="h-16 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 lg:px-6 flex items-center justify-between z-30 shrink-0">
+    <header className="h-16 box-content pt-[env(safe-area-inset-top)] bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 lg:px-6 flex items-center justify-between z-30 shrink-0">
       {/* Zone 1: Single text element Brand Zone */}
       <div className="flex items-center gap-3">
         <a

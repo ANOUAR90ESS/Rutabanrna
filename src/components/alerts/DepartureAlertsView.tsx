@@ -5,6 +5,8 @@ import type { TmbNetwork } from '../../services/network/engine';
 import { AlertStatus, DepartureAlert, WEEK, WeekDay, departureClock } from '../../services/departureAlerts';
 import { fmt, ui } from '../../i18n/ui';
 import { LineBadge, StationSearch } from '../now/shared';
+import { isNative } from '../../native/platform';
+import { nativeNotificationPermission, requestNativeNotificationPermission } from '../../native/nativeAlerts';
 
 export type AlertDraft = Partial<Omit<DepartureAlert, 'id' | 'createdAt' | 'enabled'>> & { nonce: number };
 
@@ -24,12 +26,23 @@ export const DepartureAlertsView: React.FC<{
   onAdd: (a: DepartureAlert) => void;
   onRemove: (id: string) => void;
   onToggle: (id: string) => void;
-}> = ({ network, now, lang, statuses, draft, onAdd, onRemove, onToggle }) => {
+  onPermissionChange?: () => void;
+}> = ({ network, now, lang, statuses, draft, onAdd, onRemove, onToggle, onPermissionChange }) => {
   const t = ui(lang);
   const [creating, setCreating] = useState(false);
   const [perm, setPerm] = useState<NotificationPermission | 'unsupported'>(() =>
-    typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
+    isNative ? 'default' : typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
   );
+  useEffect(() => {
+    if (isNative) nativeNotificationPermission().then((p) => setPerm(p === 'prompt' ? 'default' : p));
+  }, []);
+  const askPermission = () =>
+    isNative
+      ? requestNativeNotificationPermission().then((ok) => {
+          setPerm(ok ? 'granted' : 'denied');
+          onPermissionChange?.();
+        })
+      : Notification.requestPermission().then(setPerm);
 
   useEffect(() => {
     if (draft) setCreating(true);
@@ -51,12 +64,14 @@ export const DepartureAlertsView: React.FC<{
 
         {perm === 'default' && (
           <button
-            onClick={() => Notification.requestPermission().then(setPerm)}
+            onClick={askPermission}
             className="w-full p-3 rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-200 text-sm font-semibold flex items-center gap-2"
           >
             <BellRing className="w-4 h-4" /> {t.enableNotifications}
           </button>
         )}
+
+        {isNative && statuses.length > 0 && <p className="text-[11px] text-slate-400 px-1">{t.alertsNativeNote}</p>}
 
         {creating && (
           <AlertForm
