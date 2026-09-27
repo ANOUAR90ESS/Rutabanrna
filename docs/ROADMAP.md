@@ -14,7 +14,7 @@ Motor: `src/services/network/engine.ts` (horarios, posiciones, salidas).
 | 2 | Planificador A→B (CSA portado del prototipo): salir a / llegar antes de, sin escaleras, alternativas | ✅ hecho (`src/services/network/router.ts`, `src/components/trip/`) |
 | 3 | «Último tren a casa» y modo aeropuerto (T1/T2, hora de vuelo + margen) | ✅ hecho (`LastTrainCard.tsx`, `AirportPanel.tsx`) |
 | 4 | Avisos ligados a salidas reales: «sal ahora para coger el L1 de las 08:47» | ✅ hecho (`services/departureAlerts.ts`, `hooks/useDepartureAlerts.ts`, `components/alerts/`) |
-| 5 | 3D de la estación: accesos reales (accesible/escaleras), andenes por línea, transbordos con tiempo a pie, trenes reales llegando | ⏳ |
+| 5 | 3D de la estación: accesos reales (accesible/escaleras), andenes por línea, transbordos con tiempo a pie, trenes reales llegando | ✅ hecho (`components/station3d/Station3DView.tsx`) |
 | 6 | Limpieza: quitar valores inventados (velocidad/puertas/sonido/incidente de prueba), selector de ciudades vacío; pestañas Ahora / Ruta / Mapa | ⏳ |
 
 ## Notas técnicas
