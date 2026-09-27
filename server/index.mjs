@@ -10,41 +10,26 @@
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { corsHeaders, proxyTmb } from '../lib/tmbProxy.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const { TMB_APP_ID, TMB_APP_KEY, PORT = 3000 } = process.env;
-const API = process.env.TMB_API_BASE || 'https://api.tmb.cat/v1';
+const { TMB_APP_ID, PORT = 3000 } = process.env;
 const CACHE_MS = 15000;
 
-// Only the endpoints the app uses: never an open relay for our licence keys.
-const ALLOWED = [/^itransit\/bus\/parades\/[0-9]{1,6}$/, /^itransit\/metro\/estacions$/];
 const cache = new Map();
 
 const app = express();
 app.disable('x-powered-by');
 
+app.options('/api/tmb/*', (req, res) => res.set(corsHeaders(req.headers.origin)).sendStatus(204));
 app.get('/api/tmb/*', async (req, res) => {
-  const sub = req.params[0];
-  if (!TMB_APP_ID || !TMB_APP_KEY) return res.status(503).json({ error: 'TMB real time not configured' });
-  if (!ALLOWED.some((re) => re.test(sub))) return res.status(404).json({ error: 'not allowed' });
-  const qs = new URLSearchParams();
-  if (typeof req.query.estacions === 'string') {
-    if (!/^[0-9,]{1,200}$/.test(req.query.estacions)) return res.status(400).json({ error: 'bad estacions' });
-    qs.set('estacions', req.query.estacions);
-  }
-  const key = `${sub}?${qs}`;
+  res.set(corsHeaders(req.headers.origin));
+  const key = req.url;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_MS) return res.set('Cache-Control', 'no-store').type('json').send(hit.body);
-  qs.set('app_id', TMB_APP_ID);
-  qs.set('app_key', TMB_APP_KEY);
-  try {
-    const r = await fetch(`${API}/${sub}?${qs}`, { signal: AbortSignal.timeout(8000) });
-    const body = await r.text();
-    if (r.ok) cache.set(key, { at: Date.now(), body });
-    res.status(r.status).set('Cache-Control', 'no-store').type('json').send(body);
-  } catch {
-    res.status(502).json({ error: 'TMB API unreachable' });
-  }
+  const r = await proxyTmb(req.params[0], req.query);
+  if (r.cacheSeconds) cache.set(key, { at: Date.now(), body: r.body });
+  res.status(r.status).set('Cache-Control', 'no-store').type('json').send(r.body);
 });
 
 // Static app (SPA fallback); sw.js and data must not be cached forever
