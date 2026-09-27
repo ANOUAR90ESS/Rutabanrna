@@ -428,9 +428,30 @@ export class TmbNetwork {
     return out.sort((a, b) => a.metres - b.metres).slice(0, opts.limit ?? 5);
   }
 
+  /** Station that contains the given stop (platform) index. */
+  stationList(stopIndex: number): Station {
+    return this.stations[this.raw.stops[stopIndex].g];
+  }
+
   getStation(id: string): Station | undefined {
     const i = this.stationById.get(id);
     return i === undefined ? undefined : this.stations[i];
+  }
+
+  /** Line + direction pairs that depart from a station (for alert set-up). */
+  directionsAt(stationId: string): { lineCode: string; headsign: string }[] {
+    const si = this.stationById.get(stationId);
+    if (si === undefined) return [];
+    const seen = new Map<string, { lineCode: string; headsign: string; r: number }>();
+    for (const s of this.raw.stations[si].s) {
+      for (const pi of this.stopPatterns[s]) {
+        const p = this.patterns[pi];
+        if (p.pos.get(s)! >= p.s.length - 1) continue;
+        const key = `${p.r}|${p.h}`;
+        if (!seen.has(key)) seen.set(key, { lineCode: this.routes[p.r].n, headsign: p.h, r: p.r });
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.r - b.r || a.headsign.localeCompare(b.headsign)).map(({ lineCode, headsign }) => ({ lineCode, headsign }));
   }
 
   /** Next departures grouped by line + direction (for compact cards). */

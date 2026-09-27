@@ -83,7 +83,6 @@ interface TopNavProps {
   currentCityName: string;
   onOpenCityModal: () => void;
   onOpenNewAlert: () => void;
-  onOpenNotificationSettings: () => void;
   onOpenOfflineManager: () => void;
   activeAlertsCount: number;
   isOffline: boolean;
@@ -98,7 +97,6 @@ export const TopNav: React.FC<TopNavProps> = ({
   currentCityName,
   onOpenCityModal,
   onOpenNewAlert,
-  onOpenNotificationSettings,
   onOpenOfflineManager,
   activeAlertsCount,
   isOffline,
@@ -181,14 +179,7 @@ export const TopNav: React.FC<TopNavProps> = ({
           {isOfflineDownloaded && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>}
         </button>
 
-        {/* Notification Settings Button */}
-        <button
-          onClick={onOpenNotificationSettings}
-          title={t.customizeAlerts}
-          className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors"
-        >
-          <Sliders className="w-4 h-4" />
-        </button>
+
 
         {/* Language Selector Dropdown */}
         <div className="relative flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5">

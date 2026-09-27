@@ -10,17 +10,14 @@ import { TransitMap } from './components/TransitMap';
 import { ThreeTrainViewer } from './components/ThreeTrainViewer';
 import { LineSelector } from './components/LineSelector';
 import { DeparturesBoard } from './components/DeparturesBoard';
-import { TripAlertsModal } from './components/TripAlertsModal';
 import { LiveAlertsBanner } from './components/LiveAlertsBanner';
 import { CitySwitcherModal } from './components/CitySwitcherModal';
 import { LinesSchedulesView } from './components/LinesSchedulesView';
-import { AlertsManagerView } from './components/AlertsManagerView';
 import { ServiceNoticesView } from './components/ServiceNoticesView';
 import { LandmarkDetailsModal } from './components/LandmarkDetailsModal';
 import { LandmarksExplorerView } from './components/LandmarksExplorerView';
 import { OfflineManagerModal } from './components/OfflineManagerModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
-import { NotificationSettingsModal } from './components/NotificationSettingsModal';
 
 import { BARCELONA_LANDMARKS } from './data/landmarksData';
 import { useNow, useTmbNetwork } from './hooks/useTmbNetwork';
@@ -31,16 +28,18 @@ import {
   TransitLine,
   LiveVehicle,
   Station,
-  CustomTripAlert,
   Language,
   City,
   PointOfInterest,
-  NotificationPreferences,
   OfflinePackageState,
   AppTab,
   Place
 } from './types/transit';
-import { playAlertNotificationSound } from './utils/sound';
+import { useDepartureAlerts } from './hooks/useDepartureAlerts';
+import { DepartureAlertsView, AlertDraft } from './components/alerts/DepartureAlertsView';
+import { AlarmBanner } from './components/alerts/AlarmBanner';
+import { madridWeekDay, WeekDay } from './services/departureAlerts';
+import { formatClock } from './services/network/clock';
 import { getOfflinePackageState, getCachedLandmarks } from './services/offlineStorage';
 
 export default function App() {
@@ -89,29 +88,6 @@ export default function App() {
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
 
-  // Notification Preferences
-  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(() => {
-    try {
-      const stored = localStorage.getItem('barnatransit_notif_prefs');
-      if (stored) return JSON.parse(stored);
-    } catch {
-      // ignore
-    }
-    return {
-      enableArrivalAlerts: true,
-      enableDelayAlerts: true,
-      delayThresholdMinutes: 2,
-      enableDisruptions: true,
-      enableSound: true,
-      enablePushNotifications: false,
-      subscribedLineCodes: ['L1', 'L3', 'L5', 'H12'],
-      timeFilterEnabled: false,
-      activeStartTime: '07:00',
-      activeEndTime: '22:00'
-    };
-  });
-  const [isNotifSettingsOpen, setIsNotifSettingsOpen] = useState<boolean>(false);
-
   // Real TMB lines & stations from the GTFS feed (cached for offline use by the service worker)
   const linesData = useMemo<TransitLine[]>(() => network?.lines ?? [], [network]);
   const stationsData = useMemo<Station[]>(() => network?.stations ?? [], [network]);
@@ -123,18 +99,11 @@ export default function App() {
     return BARCELONA_LANDMARKS;
   }, [offlineState.isDownloaded, isBrowserOnline, offlineState.isSimulatedOffline]);
 
-  // Test incidents injected from the notification settings (lineCode -> delay minutes)
-  const [testIncidents, setTestIncidents] = useState<Record<string, number>>({});
-
   // Live vehicles: positions computed every second from the official timetable
   const vehicles = useMemo<LiveVehicle[]>(() => {
     if (!network) return [];
-    const list = network.vehiclesAt(now);
-    if (!Object.keys(testIncidents).length) return list;
-    return list.map((v) =>
-      testIncidents[v.lineCode] ? { ...v, delayMinutes: testIncidents[v.lineCode], isDelayed: true } : v
-    );
-  }, [network, now, testIncidents]);
+    return network.vehiclesAt(now);
+  }, [network, now]);
 
   // Service notices derived from the timetable (refreshed once a minute)
   const minuteBucket = Math.floor(now / 60000);
@@ -143,54 +112,14 @@ export default function App() {
     [network, minuteBucket]
   );
 
-  // User Custom Trip Alerts (persisted in localStorage)
-  const [alerts, setAlerts] = useState<CustomTripAlert[]>(() => {
-    try {
-      const stored = localStorage.getItem('barnatransit_alerts');
-      if (stored) return JSON.parse(stored);
-    } catch {
-      // ignore
-    }
-    return [
-      {
-        id: 'alert-default-01',
-        title: 'Metro L1 hacia Fondo',
-        lineCode: 'L1',
-        type: 'metro',
-        originStationId: '1.126',
-        originStationName: 'Catalunya',
-        destinationStationId: '1.140',
-        destinationStationName: 'Fondo',
-        targetTime: '08:45',
-        notifyMinutesBefore: 10,
-        notifyOnDelay: true,
-        enabled: true,
-        soundEnabled: true,
-        repeatDays: ['mon', 'tue', 'wed', 'thu', 'fri'],
-        createdAt: Date.now()
-      },
-      {
-        id: 'alert-default-02',
-        title: 'Metro L3 a Zona Universitària',
-        lineCode: 'L3',
-        type: 'metro',
-        originStationId: '1.319',
-        originStationName: 'Sants Estació',
-        destinationStationId: '1.314',
-        destinationStationName: 'Zona Universitària',
-        targetTime: '18:15',
-        notifyMinutesBefore: 5,
-        notifyOnDelay: true,
-        enabled: true,
-        soundEnabled: true,
-        repeatDays: ['mon', 'tue', 'wed', 'thu', 'fri'],
-        createdAt: Date.now() - 3600000
-      }
-    ];
-  });
-
-  const [isAlertModalOpen, setIsAlertModalOpen] = useState<boolean>(false);
-  const [activeTripAlarm, setActiveTripAlarm] = useState<CustomTripAlert | null>(null);
+  // "Leave now" alerts tied to real departures
+  const departureAlerts = useDepartureAlerts(network, now, lang);
+  const [alertDraft, setAlertDraft] = useState<AlertDraft | null>(null);
+  const openAlertDraft = (d: Omit<AlertDraft, 'nonce'>) => {
+    setAlertDraft({ ...d, nonce: Date.now() });
+    setActiveTab('alerts');
+  };
+  const enabledAlerts = departureAlerts.alerts.filter((a) => a.enabled).length;
 
   // Online / Offline browser event tracking
   useEffect(() => {
@@ -206,23 +135,6 @@ export default function App() {
     };
   }, []);
 
-  // Persist alerts & notification preferences
-  useEffect(() => {
-    try {
-      localStorage.setItem('barnatransit_alerts', JSON.stringify(alerts));
-    } catch {
-      // ignore
-    }
-  }, [alerts]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('barnatransit_notif_prefs', JSON.stringify(notificationPreferences));
-    } catch {
-      // ignore
-    }
-  }, [notificationPreferences]);
-
   // Adjust document direction for Arabic
   useEffect(() => {
     try {
@@ -233,91 +145,6 @@ export default function App() {
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = lang;
   }, [lang]);
-
-  // Periodic Check for Custom User Alerts & Notification Preferences Filter
-  useEffect(() => {
-    const alertChecker = setInterval(() => {
-      const now = new Date();
-      const currentHours = String(now.getHours()).padStart(2, '0');
-      const currentMinutes = String(now.getMinutes()).padStart(2, '0');
-      const currentTimeStr = `${currentHours}:${currentMinutes}`;
-
-      // Check time window filter
-      if (notificationPreferences.timeFilterEnabled) {
-        if (
-          currentTimeStr < notificationPreferences.activeStartTime ||
-          currentTimeStr > notificationPreferences.activeEndTime
-        ) {
-          return;
-        }
-      }
-
-      // Check if any active alert matches
-      alerts.forEach((alert) => {
-        if (!alert.enabled) return;
-
-        // Line filter check
-        if (
-          notificationPreferences.subscribedLineCodes.length > 0 &&
-          !notificationPreferences.subscribedLineCodes.includes(alert.lineCode)
-        ) {
-          return;
-        }
-
-        if (alert.targetTime === currentTimeStr && !activeTripAlarm) {
-          setActiveTripAlarm(alert);
-          if (alert.soundEnabled && notificationPreferences.enableSound) {
-            playAlertNotificationSound();
-          }
-        }
-      });
-    }, 8000);
-
-    return () => clearInterval(alertChecker);
-  }, [alerts, activeTripAlarm, notificationPreferences]);
-
-  // Trigger simulated delay incident for testing
-  const handleTriggerTestIncident = (lineCode: string, delayMinutes: number) => {
-    setTestIncidents((prev) => ({ ...prev, [lineCode]: delayMinutes }));
-
-    const testAlert: CustomTripAlert = {
-      id: `incident-alert-${Date.now()}`,
-      title: `Incidencia en ${lineCode}: Retraso estimado de ${delayMinutes} min`,
-      lineCode,
-      type: linesData.find((l) => l.code === lineCode)?.type ?? 'metro',
-      originStationId: '',
-      originStationName: linesData.find((l) => l.code === lineCode)?.origin ?? '',
-      destinationStationId: '',
-      destinationStationName: linesData.find((l) => l.code === lineCode)?.destination ?? 'Dirección Línea',
-      targetTime: 'Ahora',
-      notifyMinutesBefore: 0,
-      notifyOnDelay: true,
-      enabled: true,
-      soundEnabled: notificationPreferences.enableSound,
-      repeatDays: ['mon', 'tue', 'wed', 'thu', 'fri'],
-      createdAt: Date.now()
-    };
-
-    setActiveTripAlarm(testAlert);
-    if (notificationPreferences.enableSound) {
-      playAlertNotificationSound();
-    }
-  };
-
-  // Alert Handlers
-  const handleSaveAlert = (newAlert: CustomTripAlert) => {
-    setAlerts((prev) => [newAlert, ...prev]);
-  };
-
-  const handleDeleteAlert = (alertId: string) => {
-    setAlerts((prev) => prev.filter((a) => a.id !== alertId));
-  };
-
-  const handleToggleAlert = (alertId: string) => {
-    setAlerts((prev) =>
-      prev.map((a) => (a.id === alertId ? { ...a, enabled: !a.enabled } : a))
-    );
-  };
 
   // Open 3D viewer for a specific vehicle or line
   const handleOpen3DViewer = (veh: LiveVehicle) => {
@@ -331,10 +158,30 @@ export default function App() {
     setActiveTab('3d');
   };
 
-  // Pre-fill alert modal for a station
-  const handleCreateAlertForStation = (station: Station, lineCode: string) => {
+  // Pre-fill an alert for a station
+  const handleCreateAlertForStation = (station: Station) => {
     setSelectedStation(null);
-    setIsAlertModalOpen(true);
+    openAlertDraft({ stationId: station.id });
+  };
+
+  // "Remind me to leave" from a planned journey: watch its first ride
+  const handleRemindJourney = (j: Journey) => {
+    if (!network) return;
+    const first = j.legs.find((l) => l.kind === 'ride');
+    if (!first || first.kind !== 'ride') return;
+    const walkBefore = j.legs.slice(0, j.legs.indexOf(first)).reduce((a, l) => a + (l.kind === 'walk' ? l.seconds : 0), 0);
+    const day = madridWeekDay(now);
+    const weekdays: WeekDay[] = ['mon', 'tue', 'wed', 'thu', 'fri'];
+    openAlertDraft({
+      stationId: network.stationList(first.from).id,
+      lineCode: network.routes[first.route].n,
+      headsign: first.headsign,
+      from: formatClock(first.dep - 10 * 60),
+      to: formatClock(first.dep + 15 * 60),
+      walkMinutes: Math.max(1, Math.ceil(walkBefore / 60)),
+      leadMinutes: 1,
+      days: weekdays.includes(day) ? weekdays : [day]
+    });
   };
 
   // ------------------------------------------------------------ navigation helpers
@@ -389,10 +236,9 @@ export default function App() {
         setLang={setLang}
         currentCityName={selectedCity.name[lang]}
         onOpenCityModal={() => setIsCityModalOpen(true)}
-        onOpenNewAlert={() => setIsAlertModalOpen(true)}
-        onOpenNotificationSettings={() => setIsNotifSettingsOpen(true)}
+        onOpenNewAlert={() => openAlertDraft({})}
         onOpenOfflineManager={() => setIsOfflineModalOpen(true)}
-        activeAlertsCount={alerts.filter((a) => a.enabled).length}
+        activeAlertsCount={enabledAlerts}
         isOffline={isOffline}
         isOfflineDownloaded={offlineState.isDownloaded}
       />
@@ -450,6 +296,7 @@ export default function App() {
             fav={fav}
             request={tripRequest}
             onShowOnMap={handleShowJourney}
+            onRemindMe={handleRemindJourney}
             airportPanel={(apply) => <AirportPanel network={network} lang={lang} homeId={fav.home} apply={apply} />}
           />
         )}
@@ -508,8 +355,8 @@ export default function App() {
             {/* Live Service Notice Ticker */}
             <LiveAlertsBanner
               notices={serviceNotices}
-              activeTripAlarm={activeTripAlarm}
-              onDismissAlarm={() => setActiveTripAlarm(null)}
+              activeTripAlarm={null}
+              onDismissAlarm={() => undefined}
               onOpen3DViewerForLine={handleOpen3DViewerForLine}
               lang={lang}
             />
@@ -568,13 +415,15 @@ export default function App() {
 
         {/* TAB 5: MY ALERTS COMMUTE MANAGER */}
         {activeTab === 'alerts' && (
-          <AlertsManagerView
-            alerts={alerts}
-            onOpenCreateModal={() => setIsAlertModalOpen(true)}
-            onToggleAlert={handleToggleAlert}
-            onDeleteAlert={handleDeleteAlert}
-            lines={linesData}
+          <DepartureAlertsView
+            network={network}
+            now={now}
             lang={lang}
+            statuses={departureAlerts.statuses}
+            draft={alertDraft}
+            onAdd={departureAlerts.addAlert}
+            onRemove={departureAlerts.removeAlert}
+            onToggle={departureAlerts.toggleAlert}
           />
         )}
 
@@ -584,7 +433,8 @@ export default function App() {
         )}
       </main>
 
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} lang={lang} alertsCount={alerts.filter((a) => a.enabled).length} />
+      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} lang={lang} alertsCount={enabledAlerts} />
+      <AlarmBanner fired={departureAlerts.fired} now={now} lang={lang} onDismiss={departureAlerts.dismissFired} />
 
       {/* Modal: Tourist Landmark Detailed Inspector */}
       <LandmarkDetailsModal
@@ -623,29 +473,9 @@ export default function App() {
         lang={lang}
       />
 
-      {/* Modal: Notification Customization & Preferences */}
-      <NotificationSettingsModal
-        isOpen={isNotifSettingsOpen}
-        onClose={() => setIsNotifSettingsOpen(false)}
-        preferences={notificationPreferences}
-        onSavePreferences={(updated) => setNotificationPreferences(updated)}
-        onTriggerTestIncident={handleTriggerTestIncident}
-        lines={linesData}
-        lang={lang}
-      />
 
-      {/* Modal: Create or Manage Custom Trip Alerts */}
-      <TripAlertsModal
-        isOpen={isAlertModalOpen}
-        onClose={() => setIsAlertModalOpen(false)}
-        alerts={alerts}
-        onSaveAlert={handleSaveAlert}
-        onDeleteAlert={handleDeleteAlert}
-        onToggleAlert={handleToggleAlert}
-        lines={linesData}
-        stations={stationsData}
-        lang={lang}
-      />
+
+
 
       {/* Modal: City Switcher (Barcelona -> Madrid / Valencia / Sevilla) */}
       <CitySwitcherModal
