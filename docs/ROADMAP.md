@@ -16,6 +16,7 @@ Motor: `src/services/network/engine.ts` (horarios, posiciones, salidas).
 | 4 | Avisos ligados a salidas reales: «sal ahora para coger el L1 de las 08:47» | ✅ hecho (`services/departureAlerts.ts`, `hooks/useDepartureAlerts.ts`, `components/alerts/`) |
 | 5 | 3D de la estación: accesos reales (accesible/escaleras), andenes por línea, transbordos con tiempo a pie, trenes reales llegando | ✅ hecho (`components/station3d/Station3DView.tsx`) |
 | 7 | Búsqueda de direcciones y lugares (Photon → Nominatim, monumentos sin conexión, recientes) en «Ahora» y «Ruta» | ✅ hecho (`services/geocode.ts`) |
+| 8 | Cumplimiento de la licencia TMB: fuente + fecha visibles, cálculos identificados, aviso no oficial, claves en servidor (proxy) | ✅ hecho (`docs/TMB-LICENCIA.md`) |
 | 6 | Limpieza: quitar valores inventados (velocidad/puertas/sonido/incidente de prueba), selector de ciudades vacío; pestañas Ahora / Ruta / Mapa | ✅ hecho (visor 3D falso, avisos por hora fija, ajustes sin efecto y ciudades «próximamente» eliminados; 3D cargado bajo demanda) |
 
 ## Notas técnicas

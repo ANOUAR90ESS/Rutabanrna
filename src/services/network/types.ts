@@ -52,6 +52,7 @@ export interface RawService {
 export interface RawNetwork {
   v: number;
   feed: { publisher: string; version: string; start: string; end: string };
+  sources?: { gtfsPublished: string; accessesDate: string };
   generated: string;
   routes: RawRoute[];
   stations: RawStation[];

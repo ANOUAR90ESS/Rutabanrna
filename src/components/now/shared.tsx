@@ -259,7 +259,10 @@ export const StationCard: React.FC<{
                   {lang === 'en' ? 'last' : lang === 'ar' ? 'الأخير' : lang === 'ca' ? 'últim' : 'último'}
                 </span>
               )}
-              <span className="font-tech text-sm font-bold text-white tabular-nums">{waitLabel(first.timeEstimateSeconds ?? 0, lang)}</span>
+              <span className="font-tech text-sm font-bold text-white tabular-nums" title={first.type === 'bus' && !first.isRealTime ? t.approxTime : undefined}>
+                {first.type === 'bus' && !first.isRealTime ? '≈ ' : ''}
+                {waitLabel(first.timeEstimateSeconds ?? 0, lang)}
+              </span>
               <span className="text-[11px] text-slate-500 tabular-nums w-16 text-right truncate">
                 {g
                   .slice(1, 3)

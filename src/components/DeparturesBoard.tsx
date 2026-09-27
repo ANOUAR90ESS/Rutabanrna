@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { X, Bell, Clock, Radio, DoorOpen, Accessibility, ChevronDown, Navigation } from 'lucide-react';
 import { Station, TransitLine, LiveVehicle, Language, Departure } from '../types/transit';
 import { translations } from '../i18n/translations';
+import { fmt, ui } from '../i18n/ui';
 import type { TmbNetwork } from '../services/network/engine';
 import { fetchRealtimeDepartures, mergeDepartures, realtimeEnabled } from '../services/network/realtime';
 
@@ -31,6 +32,7 @@ export const DeparturesBoard: React.FC<DeparturesBoardProps> = ({
   lang
 }) => {
   const t = translations[lang];
+  const u = ui(lang);
   const [live, setLive] = useState<{ at: number; deps: Departure[] } | null>(null);
   const [showAccesses, setShowAccesses] = useState(false);
   const [onlyAccessible, setOnlyAccessible] = useState(false);
@@ -133,7 +135,7 @@ export const DeparturesBoard: React.FC<DeparturesBoardProps> = ({
           {isRealtime ? (
             <span className="text-emerald-400 flex items-center gap-1 font-mono text-[10px]">
               <Radio className="w-3 h-3 animate-pulse" />
-              {t.sourceRealtime}
+              {live ? fmt(u.realtimeAt, new Date(live.at).toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid' })) : t.sourceRealtime}
             </span>
           ) : (
             <span className="text-sky-300 flex items-center gap-1 font-mono text-[10px] normal-case">
@@ -184,6 +186,7 @@ export const DeparturesBoard: React.FC<DeparturesBoardProps> = ({
                       <span className="text-emerald-300 text-sm">{t.now}</span>
                     ) : (
                       <>
+                        {dep.type === 'bus' && !dep.isRealTime ? <span title={u.approxTime}>≈ </span> : null}
                         {dep.timeEstimateMinutes} <span className="text-[10px] font-normal text-slate-400">{t.mins}</span>
                       </>
                     )}

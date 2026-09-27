@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, Globe, Bell, Compass, Train, AlertTriangle, Layers, DownloadCloud, Sliders, Landmark, Clock, Route, Box, MoreHorizontal } from 'lucide-react';
+import { MapPin, Globe, Bell, Compass, Train, AlertTriangle, Layers, DownloadCloud, Sliders, Landmark, Clock, Route, Box, MoreHorizontal, Info } from 'lucide-react';
 import { AppTab, Language } from '../types/transit';
 import { translations } from '../i18n/translations';
 import { ui } from '../i18n/ui';
@@ -15,7 +15,8 @@ export function navItems(lang: Language, alertsCount = 0) {
     { id: '3d' as AppTab, label: u.view3d, icon: <Box className="w-4 h-4 text-rose-400" /> },
     { id: 'alerts' as AppTab, label: t.myAlerts, icon: <Bell className="w-4 h-4 text-emerald-400" />, badge: alertsCount },
     { id: 'notices' as AppTab, label: t.serviceNotices, icon: <AlertTriangle className="w-4 h-4 text-amber-400" /> },
-    { id: 'landmarks' as AppTab, label: t.landmarks, icon: <Landmark className="w-4 h-4 text-rose-400" /> }
+    { id: 'landmarks' as AppTab, label: t.landmarks, icon: <Landmark className="w-4 h-4 text-rose-400" /> },
+    { id: 'about' as AppTab, label: u.sourcesTab, icon: <Info className="w-4 h-4 text-slate-300" />, desktopHidden: true }
   ];
 }
 
@@ -127,7 +128,7 @@ export const TopNav: React.FC<TopNavProps> = ({
 
       {/* Zone 2: 4-6 Clean Text Nav Links with Active Indicator */}
       <nav className="hidden lg:flex items-center gap-1 text-sm font-medium">
-        {navItems(lang, activeAlertsCount).map((item) => (
+        {navItems(lang, activeAlertsCount).filter((item) => !('desktopHidden' in item)).map((item) => (
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}

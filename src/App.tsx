@@ -4,6 +4,9 @@ import { NowView } from './components/now/NowView';
 import { TripPlanner, TripRequest } from './components/trip/TripPlanner';
 import { AirportPanel } from './components/trip/AirportPanel';
 import { LastTrainCard } from './components/now/LastTrainCard';
+import { DataAttribution, DataStatusBanner } from './components/legal/DataAttribution';
+import { AboutView } from './components/legal/AboutView';
+import { fmt, ui } from './i18n/ui';
 import { useFavorites, useGeolocation } from './hooks/useUserContext';
 import { Router, Journey, journeyGeometry, JourneySegment } from './services/network/router';
 import { TransitMap } from './components/TransitMap';
@@ -257,6 +260,8 @@ export default function App() {
             onAirport={() => planTrip({ airport: true })}
             onOpen3D={open3DStation}
             onOpenNotices={() => setActiveTab('notices')}
+            banner={<DataStatusBanner network={network} now={now} lang={lang} />}
+            footer={<DataAttribution network={network} lang={lang} onOpenAbout={() => setActiveTab('about')} className="pt-2" />}
           >
             {router && (
               <LastTrainCard
@@ -272,6 +277,8 @@ export default function App() {
           </NowView>
         )}
 
+        {activeTab === 'about' && <AboutView network={network} lang={lang} />}
+
         {/* TAB: TRIP PLANNER */}
         {activeTab === 'trip' && router && (
           <TripPlanner
@@ -286,6 +293,7 @@ export default function App() {
             onShowOnMap={handleShowJourney}
             onRemindMe={handleRemindJourney}
             airportPanel={(apply) => <AirportPanel network={network} lang={lang} homeId={fav.home} apply={apply} />}
+            footer={<DataAttribution network={network} lang={lang} onOpenAbout={() => setActiveTab('about')} className="pt-2" />}
           />
         )}
 
@@ -307,6 +315,7 @@ export default function App() {
 
             {/* Leaflet Map Canvas with Landmarks & Offline Handling */}
             <TransitMap
+              dataAttribution={fmt(ui(lang).attributionShort, network.sourceInfo.published)}
               lines={displayLines}
               stations={stationsData}
               journey={mapJourney?.segments ?? null}

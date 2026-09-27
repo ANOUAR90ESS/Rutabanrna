@@ -2,6 +2,7 @@ import React from 'react';
 import { AlertTriangle, Info, CheckCircle2, ShieldCheck, Clock } from 'lucide-react';
 import { ServiceNotice, Language } from '../types/transit';
 import { translations } from '../i18n/translations';
+import { ui } from '../i18n/ui';
 
 interface ServiceNoticesViewProps {
   notices: ServiceNotice[];
@@ -72,7 +73,7 @@ export const ServiceNoticesView: React.FC<ServiceNoticesViewProps> = ({ notices,
                     <p className="text-xs text-slate-400 leading-relaxed">{notice.description[lang]}</p>
                     <div className="text-[11px] text-slate-500 mt-2 flex items-center gap-1.5">
                       <Clock className="w-3 h-3" />
-                      <span>{notice.timestamp}</span>
+                      <span>{notice.timestamp === 'GTFS' ? ui(lang).derivedNotice : notice.timestamp}</span>
                     </div>
                   </div>
                 </div>

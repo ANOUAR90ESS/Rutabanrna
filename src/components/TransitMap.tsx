@@ -3,8 +3,11 @@ import L from 'leaflet';
 import { TransitLine, LiveVehicle, Station, TransitType, Language, PointOfInterest } from '../types/transit';
 import { translations } from '../i18n/translations';
 import type { JourneySegment } from '../services/network/router';
+import { ui } from '../i18n/ui';
 
 interface TransitMapProps {
+  /** Source + update date shown in the map attribution (TMB licence). */
+  dataAttribution?: string;
   lines: TransitLine[];
   stations: Station[];
   journey?: JourneySegment[] | null;
@@ -31,6 +34,7 @@ const esc = (v: string) => v.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const BUS_DETAIL_ZOOM = 15;
 
 export const TransitMap: React.FC<TransitMapProps> = ({
+  dataAttribution,
   lines,
   stations,
   journey,
@@ -72,7 +76,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       center: [41.3879, 2.16992],
       zoom: 13,
       zoomControl: false,
-      attributionControl: false,
+      attributionControl: true,
       preferCanvas: true
     });
     const syncView = () => setView({ zoom: map.getZoom(), bounds: map.getBounds().pad(0.2) });
@@ -84,8 +88,10 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     // CartoDB Dark Matter tiles
+    map.attributionControl.setPrefix(false);
     const tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>',
       subdomains: 'abcd',
       errorTileUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="%23090d16"/><path d="M0 0h256v256H0z" fill="none" stroke="%231e293b" stroke-width="0.5"/></svg>'
     }).addTo(map);
@@ -362,11 +368,12 @@ export const TransitMap: React.FC<TransitMapProps> = ({
             <span class="text-xs font-bold text-white capitalize">${v.type}</span>
           </div>
           <span class="text-[10px] px-1.5 py-0.5 rounded font-mono ${v.isDelayed ? 'bg-amber-500/20 text-amber-300' : 'bg-sky-500/20 text-sky-300'}">
-            ${v.isDelayed ? `+${v.delayMinutes}m` : esc(t.sourceSchedule)}
+            ${v.isDelayed ? `+${v.delayMinutes}m` : '≈'}
           </span>
         </div>
 
         <div class="py-2 space-y-1 text-xs">
+          <div class="text-[10px] text-amber-300/90">${esc(ui(lang).estimatedPos)}</div>
           <div class="text-slate-400">${esc(t.destination)}: <strong class="text-slate-200">${esc(v.destination)}</strong></div>
           <div class="text-slate-400">${esc(t.nextStop)}: <strong class="text-slate-200">${esc(v.nextStationName)}</strong></div>
           <div class="flex items-center justify-between pt-1">
@@ -394,6 +401,16 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       }
     });
   }, [vehicles, lines, selectedType, searchQuery, busDetail, singleLine, view, t]);
+
+  // TMB data source in the attribution control
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !dataAttribution) return;
+    map.attributionControl.addAttribution(dataAttribution);
+    return () => {
+      map.attributionControl.removeAttribution(dataAttribution);
+    };
+  }, [dataAttribution]);
 
   // Planned journey overlay
   useEffect(() => {

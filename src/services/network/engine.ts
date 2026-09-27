@@ -191,6 +191,27 @@ export class TmbNetwork {
     return { start: this.raw.feed.start, end: this.raw.feed.end, version: this.raw.feed.version };
   }
 
+  /** Source dates to display (TMB licence: cite source and date of last update). */
+  get sourceInfo() {
+    const d = (ymd: string) => (ymd && ymd.length === 8 ? `${ymd.slice(6, 8)}/${ymd.slice(4, 6)}/${ymd.slice(0, 4)}` : '—');
+    const iso = (x?: string) => (x ? d(x.slice(0, 10).replace(/-/g, '')) : '—');
+    return {
+      published: iso(this.raw.sources?.gtfsPublished) !== '—' ? iso(this.raw.sources?.gtfsPublished) : d(this.raw.feed.start),
+      validFrom: d(this.raw.feed.start),
+      validTo: d(this.raw.feed.end),
+      accessesDate: iso(this.raw.sources?.accessesDate)
+    };
+  }
+
+  /** Whether the bundled timetable still covers today. */
+  dataStatus(ms: number): { expired: boolean; daysLeft: number } {
+    const c = madridClock(ms);
+    const end = this.raw.feed.end;
+    const toDate = (ymd: string) => Date.UTC(+ymd.slice(0, 4), +ymd.slice(4, 6) - 1, +ymd.slice(6, 8));
+    const daysLeft = end ? Math.round((toDate(end) - toDate(c.ymd)) / 86400000) : 999;
+    return { expired: daysLeft < 0 || !this.raw.dates[c.ymd], daysLeft };
+  }
+
   hasServiceData(ymd: string): boolean {
     return !!this.raw.dates[ymd];
   }
