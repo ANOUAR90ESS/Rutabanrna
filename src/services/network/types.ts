@@ -60,4 +60,5 @@ export interface RawNetwork {
   patterns: RawPattern[];
   services: RawService[];
   dates: Record<string, number[]>; // YYYYMMDD -> service indices
+  x?: [number, number, number][];  // interchanges between platforms: fromStop, toStop, seconds
 }

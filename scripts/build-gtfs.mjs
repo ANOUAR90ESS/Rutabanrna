@@ -117,6 +117,7 @@ const calendar = readCsv(dir, 'calendar.txt');
 const calendarDates = readCsv(dir, 'calendar_dates.txt');
 const frequencies = readCsv(dir, 'frequencies.txt');
 const pathways = readCsv(dir, 'pathways.txt');
+const transfersCsv = readCsv(dir, 'transfers.txt');
 
 // Routes ---------------------------------------------------------------
 const kindOf = (r) => (r.route_type === '1' ? 'metro' : r.route_type === '7' ? 'funicular' : 'bus');
@@ -386,6 +387,21 @@ const outShapes = shapes.map((pts) => {
   return o;
 });
 
+// Interchanges between platforms (transfers.txt + pathways "Correspondència"): [fromStop, toStop, seconds]
+const xfer = new Map();
+const addX = (a, b, secs) => {
+  const i = stopIdx.get(a), j = stopIdx.get(b);
+  if (i === undefined || j === undefined || i === j || !Number.isFinite(secs)) return;
+  const key = i + ',' + j;
+  xfer.set(key, Math.max(xfer.get(key) || 0, secs));
+};
+for (const t of transfersCsv) addX(t.from_stop_id, t.to_stop_id, +t.min_transfer_time || 120);
+for (const p of pathways) if (p.pathway_mode === '2' && stopIdx.has(p.from_stop_id) && stopIdx.has(p.to_stop_id)) {
+  addX(p.from_stop_id, p.to_stop_id, +p.traversal_time);
+  if (p.is_bidirectional === '1') addX(p.to_stop_id, p.from_stop_id, +p.traversal_time);
+}
+const outX = [...xfer].map(([k, v]) => [...k.split(',').map(Number), v]);
+
 const out = {
   v: 1,
   feed: { publisher: feedInfo.feed_publisher_name || 'TMB', version: feedInfo.feed_version || '', start: feedStart, end: feedEnd },
@@ -403,11 +419,13 @@ const out = {
   shapes: outShapes,
   patterns,
   services: outServices,
-  dates: outDates
+  dates: outDates,
+  x: outX
 };
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, JSON.stringify(out));
 const size = fs.statSync(OUT).size;
+console.log(`interchanges=${outX.length}`);
 console.log(`routes=${routes.length} stations=${stations.length} stops=${stops.length} shapes=${shapes.length} patterns=${patterns.length} services=${outServices.length} dates=${Object.keys(outDates).length}`);
 console.log(`Wrote ${path.relative(ROOT, OUT)} (${(size / 1024 / 1024).toFixed(2)} MB)`);

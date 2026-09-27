@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { TopNav } from './components/TopNav';
+import { TopNav, BottomNav } from './components/TopNav';
+import { NowView } from './components/now/NowView';
+import { TripPlanner, TripRequest } from './components/trip/TripPlanner';
+import { useFavorites, useGeolocation } from './hooks/useUserContext';
+import { Router, Journey, journeyGeometry, JourneySegment } from './services/network/router';
 import { TransitMap } from './components/TransitMap';
 import { ThreeTrainViewer } from './components/ThreeTrainViewer';
 import { LineSelector } from './components/LineSelector';
@@ -30,7 +34,9 @@ import {
   City,
   PointOfInterest,
   NotificationPreferences,
-  OfflinePackageState
+  OfflinePackageState,
+  AppTab,
+  Place
 } from './types/transit';
 import { playAlertNotificationSound } from './utils/sound';
 import { getOfflinePackageState, getCachedLandmarks } from './services/offlineStorage';
@@ -41,8 +47,24 @@ export default function App() {
   const network = networkStatus.state === 'ready' ? networkStatus.network : null;
   const now = useNow(1000);
   // Navigation & Localization
-  const [activeTab, setActiveTab] = useState<'map' | '3d' | 'landmarks' | 'lines' | 'alerts' | 'notices'>('map');
-  const [lang, setLang] = useState<Language>('es');
+  const [activeTab, setActiveTab] = useState<AppTab>('now');
+  const [lang, setLang] = useState<Language>(() => {
+    try {
+      const saved = localStorage.getItem('barnatransit_lang') as Language | null;
+      if (saved && ['es', 'en', 'ca', 'ar'].includes(saved)) return saved;
+    } catch {
+      // ignore
+    }
+    const nav = (typeof navigator !== 'undefined' ? navigator.language : 'es').slice(0, 2);
+    return (['es', 'en', 'ca', 'ar'].includes(nav) ? nav : 'es') as Language;
+  });
+
+  // User context: location, favourites, planner
+  const { geo, requestLocation } = useGeolocation();
+  const { fav, toggleStar, setHome, setWork } = useFavorites();
+  const router = useMemo(() => (network ? new Router(network) : null), [network]);
+  const [tripRequest, setTripRequest] = useState<TripRequest | null>(null);
+  const [mapJourney, setMapJourney] = useState<{ segments: JourneySegment[]; lineCodes: string[] } | null>(null);
   const [selectedCity, setSelectedCity] = useState<City>(CITIES[0]);
   const [isCityModalOpen, setIsCityModalOpen] = useState<boolean>(false);
 
@@ -201,6 +223,11 @@ export default function App() {
 
   // Adjust document direction for Arabic
   useEffect(() => {
+    try {
+      localStorage.setItem('barnatransit_lang', lang);
+    } catch {
+      // ignore
+    }
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = lang;
   }, [lang]);
@@ -308,11 +335,41 @@ export default function App() {
     setIsAlertModalOpen(true);
   };
 
+  // ------------------------------------------------------------ navigation helpers
+  const stationPlace = (s: Station): Place => ({ kind: 'station', stationId: s.id, name: s.name });
+  const openStationOnMap = useCallback((s: Station) => {
+    setMapJourney(null);
+    setActiveLineCode(null);
+    setSelectedStation(s);
+    setActiveTab('map');
+  }, []);
+  const planTrip = (r: Omit<TripRequest, 'nonce'>) => {
+    setTripRequest({ ...r, nonce: Date.now() });
+    setActiveTab('trip');
+  };
+  const goToFavorite = (id?: string) => {
+    const s = id && network ? network.getStation(id) : undefined;
+    if (s) planTrip({ to: stationPlace(s), mode: 'now' });
+  };
+  const handleShowJourney = (j: Journey, from: Place, to: Place) => {
+    if (!network) return;
+    const pt = (p: Place): [number, number] | undefined =>
+      p.kind === 'location' ? [p.lat, p.lng] : (() => { const s = network.getStation(p.stationId); return s ? [s.lat, s.lng] : undefined; })();
+    setSelectedStation(null);
+    setActiveLineCode(null);
+    setMapJourney({
+      segments: journeyGeometry(network, j, pt(from), pt(to)),
+      lineCodes: j.legs.flatMap((l) => (l.kind === 'ride' ? [network.routes[l.route].n] : []))
+    });
+    setActiveTab('map');
+  };
+
   // Filter lines based on active Line Code
   const displayLines = useMemo(() => {
+    if (mapJourney) return linesData.filter((l) => mapJourney.lineCodes.includes(l.code));
     if (!activeLineCode) return linesData;
     return linesData.filter((l) => l.code === activeLineCode);
-  }, [activeLineCode, linesData]);
+  }, [activeLineCode, linesData, mapJourney]);
 
   const isOffline = !isBrowserOnline || offlineState.isSimulatedOffline;
 
@@ -339,7 +396,49 @@ export default function App() {
       />
 
       {/* Main View Area */}
-      <main className="relative flex-1 w-full h-[calc(100vh-4rem)] overflow-hidden">
+      <main className="relative flex-1 w-full h-[calc(100vh-4rem)] overflow-hidden pb-16 lg:pb-0">
+        {/* TAB: NOW (home) */}
+        {activeTab === 'now' && (
+          <NowView
+            network={network}
+            now={now}
+            lang={lang}
+            geo={geo}
+            onRequestLocation={requestLocation}
+            fav={fav}
+            onToggleStar={toggleStar}
+            onSetHome={setHome}
+            onSetWork={setWork}
+            notices={serviceNotices}
+            onOpenMap={openStationOnMap}
+            onRouteFrom={(s) => planTrip({ from: stationPlace(s), to: null })}
+            onRouteTo={(s) => planTrip({ to: stationPlace(s) })}
+            onGoHome={() => goToFavorite(fav.home)}
+            onGoWork={() => goToFavorite(fav.work)}
+            onAirport={() => planTrip({ airport: true })}
+            onOpen3D={(s) => {
+              setSelectedStation(s);
+              setActiveTab('3d');
+            }}
+            onOpenNotices={() => setActiveTab('notices')}
+          />
+        )}
+
+        {/* TAB: TRIP PLANNER */}
+        {activeTab === 'trip' && router && (
+          <TripPlanner
+            network={network}
+            router={router}
+            now={now}
+            lang={lang}
+            geo={geo}
+            onRequestLocation={requestLocation}
+            fav={fav}
+            request={tripRequest}
+            onShowOnMap={handleShowJourney}
+          />
+        )}
+
         {/* TAB 1: INTERACTIVE LIVE MAP */}
         {activeTab === 'map' && (
           <div className="relative w-full h-full">
@@ -360,9 +459,11 @@ export default function App() {
             <TransitMap
               lines={displayLines}
               stations={stationsData}
+              journey={mapJourney?.segments ?? null}
+              onClearJourney={() => setMapJourney(null)}
               vehicles={vehicles}
               landmarks={landmarksData}
-              showLandmarks={showLandmarksOnMap}
+              showLandmarks={showLandmarksOnMap && !mapJourney}
               onToggleLandmarks={() => setShowLandmarksOnMap(!showLandmarksOnMap)}
               selectedType={selectedType}
               searchQuery={searchQuery}
@@ -467,6 +568,8 @@ export default function App() {
           <ServiceNoticesView notices={serviceNotices} lang={lang} />
         )}
       </main>
+
+      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} lang={lang} alertsCount={alerts.filter((a) => a.enabled).length} />
 
       {/* Modal: Tourist Landmark Detailed Inspector */}
       <LandmarkDetailsModal

@@ -403,7 +403,7 @@ export class TmbNetwork {
       if (!future.length || future[0] - c.secs > 60 * 60) {
         if (running) return;
         const next = future[0] !== undefined ? formatClock(future[0]) : null;
-        notices.push(makeNotice(`closed-${r.n}`, r.n, 'works', 'medium', noticeText.closed(r.n, next)));
+        notices.push(makeNotice(`closed-${r.n}`, r.n, 'info', 'low', noticeText.closed(r.n, next)));
         return;
       }
       const last = lastOfNight(future);
@@ -413,6 +413,39 @@ export class TmbNetwork {
       }
     });
     return notices;
+  }
+
+  /** Stations within `radius` metres, closest first. */
+  nearbyStations(lat: number, lng: number, opts: { radius?: number; bus?: boolean; limit?: number } = {}): { station: Station; metres: number }[] {
+    const radius = opts.radius ?? 800;
+    const out: { station: Station; metres: number }[] = [];
+    for (const s of this.stations) {
+      if (opts.bus !== undefined && !!s.isBusStop !== opts.bus) continue;
+      if (Math.abs(s.lat - lat) > 0.02 || Math.abs(s.lng - lng) > 0.03) continue;
+      const d = metres([lat, lng], [s.lat, s.lng]);
+      if (d <= radius) out.push({ station: s, metres: d });
+    }
+    return out.sort((a, b) => a.metres - b.metres).slice(0, opts.limit ?? 5);
+  }
+
+  getStation(id: string): Station | undefined {
+    const i = this.stationById.get(id);
+    return i === undefined ? undefined : this.stations[i];
+  }
+
+  /** Next departures grouped by line + direction (for compact cards). */
+  departureGroups(stationId: string, ms: number, perGroup = 3) {
+    const deps = this.departuresAt(stationId, ms, perGroup);
+    const groups = new Map<string, Departure[]>();
+    deps.forEach((d) => {
+      const k = `${d.lineCode}|${d.destination}`;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k)!.push(d);
+    });
+    return [...groups.values()].sort((a, b) => {
+      const la = this.lineIndexByCode.get(a[0].lineCode) ?? 999, lb = this.lineIndexByCode.get(b[0].lineCode) ?? 999;
+      return la - lb || (a[0].timeEstimateSeconds ?? 0) - (b[0].timeEstimateSeconds ?? 0);
+    });
   }
 
   nearestStation(lat: number, lng: number, opts: { metroOnly?: boolean } = {}): Station | null {
@@ -429,6 +462,19 @@ export class TmbNetwork {
     for (let i = 0; i < 7; i++) { const d = ymdShift(ymd, i); if (this.raw.dates[d]) return d; }
     return null;
   }
+}
+
+/** Walking time estimate: straight-line distance × 1.3 detour at 1.25 m/s. */
+export function walkSeconds(m: number): number {
+  return Math.round((m * 1.3) / 1.25);
+}
+
+export function distanceMetres(a: [number, number], b: [number, number]): number {
+  return metres(a, b);
+}
+
+export function normalizeText(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[·|.'’\-]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 export function lastOfNight(times: number[]): number {

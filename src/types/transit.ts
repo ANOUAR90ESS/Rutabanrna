@@ -165,3 +165,10 @@ export interface City {
   systems: string[];
 }
 
+
+/** A trip-planner endpoint: a station/stop or a raw coordinate (e.g. the user's location). */
+export type Place =
+  | { kind: 'station'; stationId: string; name: string }
+  | { kind: 'location'; lat: number; lng: number; name: string };
+
+export type AppTab = 'now' | 'trip' | 'map' | 'lines' | '3d' | 'landmarks' | 'alerts' | 'notices';
