@@ -6,7 +6,7 @@ import { AlertStatus, DepartureAlert, WEEK, WeekDay, departureClock } from '../.
 import { fmt, ui } from '../../i18n/ui';
 import { LineBadge, StationSearch } from '../now/shared';
 import { isNative } from '../../native/platform';
-import { nativeNotificationPermission, requestNativeNotificationPermission } from '../../native/nativeAlerts';
+import { exactAlarmsAllowed, nativeNotificationPermission, openExactAlarmSetting, requestNativeNotificationPermission } from '../../native/nativeAlerts';
 
 export type AlertDraft = Partial<Omit<DepartureAlert, 'id' | 'createdAt' | 'enabled'>> & { nonce: number };
 
@@ -33,8 +33,10 @@ export const DepartureAlertsView: React.FC<{
   const [perm, setPerm] = useState<NotificationPermission | 'unsupported'>(() =>
     isNative ? 'default' : typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
   );
+  const [exactOk, setExactOk] = useState(true);
   useEffect(() => {
     if (isNative) nativeNotificationPermission().then((p) => setPerm(p === 'prompt' ? 'default' : p));
+    if (isNative) exactAlarmsAllowed().then(setExactOk);
   }, []);
   const askPermission = () =>
     isNative
@@ -71,6 +73,21 @@ export const DepartureAlertsView: React.FC<{
           </button>
         )}
 
+        {isNative && perm === 'granted' && !exactOk && statuses.length > 0 && (
+          <button
+            onClick={() =>
+              openExactAlarmSetting().then((ok) => {
+                setExactOk(ok);
+                onPermissionChange?.();
+              })
+            }
+            className="w-full p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-100 text-sm text-left"
+          >
+            <span className="font-semibold">{t.exactAlarmsTitle}</span>
+            <span className="block text-xs text-amber-200/80 mt-0.5">{t.exactAlarmsBody}</span>
+          </button>
+        )}
+
         {isNative && statuses.length > 0 && <p className="text-[11px] text-slate-400 px-1">{t.alertsNativeNote}</p>}
 
         {creating && (
@@ -92,7 +109,7 @@ export const DepartureAlertsView: React.FC<{
           <p className="text-sm text-slate-400 p-4 rounded-2xl bg-slate-900/60 border border-slate-800">{t.alertsEmpty}</p>
         )}
 
-        {statuses.map(({ alert: a, next, notifyIn }) => {
+        {statuses.map(({ alert: a, next, notifyIn, idle }) => {
           const line = network.lines[network.lineIndexByCode.get(a.lineCode) ?? -1];
           return (
             <div key={a.id} className={`rounded-2xl border p-3 ${a.enabled ? 'bg-slate-900/80 border-slate-700' : 'bg-slate-950 border-slate-800 opacity-60'}`}>
@@ -128,6 +145,12 @@ export const DepartureAlertsView: React.FC<{
                     <span className={notifyIn <= 0 ? 'text-amber-300' : 'text-emerald-300'}>
                       {notifyIn <= 0 ? t.alertLeave : fmt(t.alertNext, `${Math.ceil(notifyIn / 60)} ${t.min}`)} · {a.lineCode} {departureClock(now, next)}
                     </span>
+                  ) : idle === 'later' ? (
+                    <span className="text-sky-300">{fmt(t.alertStartsAt, a.from)}</span>
+                  ) : idle === 'not-today' ? (
+                    <span className="text-slate-500">{t.alertNotToday}</span>
+                  ) : idle === 'ended' ? (
+                    <span className="text-slate-500">{t.alertEndedToday}</span>
                   ) : (
                     <span className="text-slate-500">{t.alertNone}</span>
                   )}

@@ -78,3 +78,7 @@
 .s3d-acc-ok { border-color: #38bdf8; color: #e0f2fe; }
 .s3d-ic { background: rgba(120, 53, 15, 0.85); border: 1px solid #fbbf24; color: #fef3c7; }
 .s3d-train { background: var(--c); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6); font-weight: 800; }
+
+@media (max-width: 640px) {
+  .s3d-plat, .s3d-acc, .s3d-ic, .s3d-train { font-size: 9px; padding: 1px 4px; }
+}

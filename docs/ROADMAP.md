@@ -27,6 +27,6 @@ Motor: `src/services/network/engine.ts` (horarios, posiciones, salidas).
 
 ## Ideas siguientes (no empezadas)
 - Web: avisos con la app cerrada (requiere push). En Android ya funcionan con notificaciones locales.
-- Publicar en Google Play (clave de firma, ficha, política de privacidad).
+- Publicar en Google Play: todo preparado en `docs/GOOGLE_PLAY.md`; faltan las acciones del titular (cuenta, clave, email de contacto, prueba cerrada).
 - Tiempo real TMB (iTransit) probado con claves reales; mostrar retrasos en rutas.
 - Incidencias oficiales de TMB (API de avisos) en lugar de solo avisos derivados del horario.

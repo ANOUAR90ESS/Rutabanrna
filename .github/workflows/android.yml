@@ -18,6 +18,8 @@ jobs:
       # Repository variable (Settings → Secrets and variables → Actions → Variables):
       # full URL of the Vercel proxy, e.g. https://barnatransit.vercel.app/api/tmb
       VITE_TMB_PROXY_URL: ${{ vars.TMB_PROXY_URL }}
+      # Public web address (Vercel), used for the privacy policy link inside the app
+      VITE_PUBLIC_URL: ${{ vars.PUBLIC_URL }}
       ANDROID_VERSION_CODE: ${{ github.run_number }}
       ANDROID_VERSION_NAME: 1.0.${{ github.run_number }}
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
