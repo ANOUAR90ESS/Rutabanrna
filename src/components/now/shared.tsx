@@ -30,10 +30,14 @@ export const StationSearch: React.FC<{
   placeholder?: string;
   onPick: (s: Station) => void;
   autoFocus?: boolean;
-}> = ({ network, lang, placeholder, onPick, autoFocus }) => {
+  metroOnly?: boolean;
+}> = ({ network, lang, placeholder, onPick, autoFocus, metroOnly }) => {
   const t = ui(lang);
   const [q, setQ] = useState('');
-  const index = useMemo(() => network.stations.map((s) => ({ s, n: normalizeText(s.name) })), [network]);
+  const index = useMemo(
+    () => network.stations.filter((s) => !metroOnly || !s.isBusStop).map((s) => ({ s, n: normalizeText(s.name) })),
+    [network, metroOnly]
+  );
   const hits = useMemo(() => {
     const v = normalizeText(q);
     if (v.length < 2) return [];

@@ -428,6 +428,48 @@ export class TmbNetwork {
     return out.sort((a, b) => a.metres - b.metres).slice(0, opts.limit ?? 5);
   }
 
+  /** Geometry of a station for the 3D view: platforms with their track, interchanges, entrances. */
+  stationLayout(stationId: string) {
+    const si = this.stationById.get(stationId);
+    if (si === undefined) return null;
+    const st = this.raw.stations[si];
+    const station = this.stations[si];
+    const pointAt = (sh: Shape, d: number): [number, number] => {
+      let lo = upper(sh.cum, d) - 1;
+      lo = Math.max(0, Math.min(sh.pts.length - 2, lo));
+      const seg = sh.cum[lo + 1] - sh.cum[lo] || 1;
+      const g = Math.max(0, Math.min(1, (d - sh.cum[lo]) / seg));
+      const A = sh.pts[lo], B = sh.pts[lo + 1];
+      return [A[0] + (B[0] - A[0]) * g, A[1] + (B[1] - A[1]) * g];
+    };
+    const platforms = st.s.map((stopIndex) => {
+      const stop = this.raw.stops[stopIndex];
+      // longest pattern through this stop, with a shape
+      const pi = this.stopPatterns[stopIndex]
+        .filter((i) => this.patterns[i].sh >= 0 && this.patterns[i].k.length === this.patterns[i].s.length)
+        .sort((a, b) => this.patterns[b].s.length - this.patterns[a].s.length)[0];
+      const route = this.routes[stop.r[0]];
+      let track: [number, number][] = [];
+      let dir: [number, number] = [stop.lat + 0.0003, stop.lon];
+      if (pi !== undefined) {
+        const p = this.patterns[pi];
+        const sh = this.shapes[p.sh];
+        const d = p.k[p.pos.get(stopIndex)!];
+        const a = Math.max(0, d - 450), b = Math.min(sh.cum[sh.cum.length - 1], d + 450);
+        track = [pointAt(sh, a), ...sh.pts.filter((_, i) => sh.cum[i] > a && sh.cum[i] < b), pointAt(sh, b)];
+        dir = pointAt(sh, Math.min(b, d + 40));
+        const back = pointAt(sh, Math.max(a, d - 40));
+        return { stopIndex, lineCode: route.n, color: route.c, lat: stop.lat, lng: stop.lon, accessible: stop.w === 1, dirFrom: back, dirTo: dir, track };
+      }
+      return { stopIndex, lineCode: route.n, color: route.c, lat: stop.lat, lng: stop.lon, accessible: stop.w === 1, dirFrom: [stop.lat, stop.lon] as [number, number], dirTo: dir, track };
+    });
+    const set = new Set(st.s);
+    const interchanges = (this.raw.x || [])
+      .filter(([a, b]) => set.has(a) && set.has(b))
+      .map(([a, b, secs]) => ({ from: this.routes[this.raw.stops[a].r[0]].n, to: this.routes[this.raw.stops[b].r[0]].n, a, b, secs }));
+    return { station, center: [st.lat, st.lon] as [number, number], platforms, interchanges, accesses: station.accesses ?? [] };
+  }
+
   /** Station that contains the given stop (platform) index. */
   stationList(stopIndex: number): Station {
     return this.stations[this.raw.stops[stopIndex].g];

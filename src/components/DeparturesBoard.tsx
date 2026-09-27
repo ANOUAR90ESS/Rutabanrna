@@ -13,6 +13,7 @@ interface DeparturesBoardProps {
   vehicles: LiveVehicle[];
   onClose: () => void;
   onOpen3DViewer: (vehicle: LiveVehicle) => void;
+  onOpen3DStation?: (station: Station) => void;
   onCreateAlertForStation: (station: Station, lineCode: string) => void;
   lang: Language;
 }
@@ -26,7 +27,7 @@ export const DeparturesBoard: React.FC<DeparturesBoardProps> = ({
   lines,
   vehicles,
   onClose,
-  onOpen3DViewer,
+  onOpen3DStation,
   onCreateAlertForStation,
   lang
 }) => {
@@ -67,7 +68,6 @@ export const DeparturesBoard: React.FC<DeparturesBoardProps> = ({
   if (!station) return null;
 
   const isRealtime = departures.some((d) => d.isRealTime);
-  const vehicleById = new Map(vehicles.map((v) => [v.id, v]));
 
   return (
     <div className="absolute top-44 left-4 z-30 w-[calc(100%-2rem)] sm:w-96 max-h-[calc(100%-12rem)] overflow-y-auto bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl shadow-2xl animate-fadeIn">
@@ -108,12 +108,23 @@ export const DeparturesBoard: React.FC<DeparturesBoardProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          {!station.isBusStop && onOpen3DStation && (
+            <button
+              onClick={() => onOpen3DStation(station)}
+              title={t.inspect3D}
+              className="px-2 py-1 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[11px] font-bold"
+            >
+              3D
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Departures List */}
@@ -136,7 +147,6 @@ export const DeparturesBoard: React.FC<DeparturesBoardProps> = ({
         {departures.length === 0 && <p className="text-xs text-slate-400 px-1 py-3">{t.noDepartures}</p>}
 
         {departures.map((dep, idx) => {
-          const vehicle = vehicleById.get(dep.vehicleId) || null;
           const secs = dep.timeEstimateSeconds ?? dep.timeEstimateMinutes * 60;
           return (
             <div
@@ -182,16 +192,7 @@ export const DeparturesBoard: React.FC<DeparturesBoardProps> = ({
                   {dep.delayMinutes > 0 && <span className="text-[9px] text-amber-400 font-mono">+{dep.delayMinutes}m</span>}
                 </div>
 
-                {/* 3D Inspect Trigger (vehicle already running) */}
-                {vehicle && (
-                  <button
-                    onClick={() => onOpen3DViewer(vehicle)}
-                    title={t.inspect3D}
-                    className="p-1.5 rounded-lg bg-sky-500/20 text-sky-400 hover:bg-sky-500/30 border border-sky-500/30 transition-colors"
-                  >
-                    <span className="text-[10px] font-bold">3D</span>
-                  </button>
-                )}
+
               </div>
             </div>
           );

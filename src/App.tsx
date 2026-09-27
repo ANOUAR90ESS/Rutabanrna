@@ -7,7 +7,7 @@ import { LastTrainCard } from './components/now/LastTrainCard';
 import { useFavorites, useGeolocation } from './hooks/useUserContext';
 import { Router, Journey, journeyGeometry, JourneySegment } from './services/network/router';
 import { TransitMap } from './components/TransitMap';
-import { ThreeTrainViewer } from './components/ThreeTrainViewer';
+import { Station3DView } from './components/station3d/Station3DView';
 import { LineSelector } from './components/LineSelector';
 import { DeparturesBoard } from './components/DeparturesBoard';
 import { LiveAlertsBanner } from './components/LiveAlertsBanner';
@@ -77,7 +77,7 @@ export default function App() {
   // Selection states
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<LiveVehicle | null>(null);
-  const [viewer3DVehicle, setViewer3DVehicle] = useState<LiveVehicle | null>(null);
+  const [station3D, setStation3D] = useState<Station | null>(null);
   const [selectedLandmark, setSelectedLandmark] = useState<PointOfInterest | null>(null);
   const [showLandmarksOnMap, setShowLandmarksOnMap] = useState<boolean>(true);
 
@@ -146,17 +146,13 @@ export default function App() {
     document.documentElement.lang = lang;
   }, [lang]);
 
-  // Open 3D viewer for a specific vehicle or line
-  const handleOpen3DViewer = (veh: LiveVehicle) => {
-    setViewer3DVehicle(veh);
+  // 3D station view: open the station a vehicle is heading to, or a line's first station
+  const open3DStation = (s: Station | null | undefined) => {
+    setStation3D(s && !s.isBusStop ? s : null);
     setActiveTab('3d');
   };
-
-  const handleOpen3DViewerForLine = (lineCode: string) => {
-    const veh = vehicles.find((v) => v.lineCode === lineCode) || vehicles[0] || null;
-    setViewer3DVehicle(veh);
-    setActiveTab('3d');
-  };
+  const handleOpen3DViewer = (veh: LiveVehicle) => open3DStation(network?.getStation(veh.nextStationId));
+  const handleOpen3DViewerForLine = (lineCode: string) => open3DStation(linesData.find((l) => l.code === lineCode)?.stations[0]);
 
   // Pre-fill an alert for a station
   const handleCreateAlertForStation = (station: Station) => {
@@ -264,10 +260,7 @@ export default function App() {
             onGoHome={() => goToFavorite(fav.home)}
             onGoWork={() => goToFavorite(fav.work)}
             onAirport={() => planTrip({ airport: true })}
-            onOpen3D={(s) => {
-              setSelectedStation(s);
-              setActiveTab('3d');
-            }}
+            onOpen3D={open3DStation}
             onOpenNotices={() => setActiveTab('notices')}
           >
             {router && (
@@ -349,6 +342,7 @@ export default function App() {
               onClose={() => setSelectedStation(null)}
               onOpen3DViewer={handleOpen3DViewer}
               onCreateAlertForStation={handleCreateAlertForStation}
+              onOpen3DStation={open3DStation}
               lang={lang}
             />
 
@@ -371,13 +365,7 @@ export default function App() {
 
         {/* TAB 2: FULL-SCREEN 3D TRAIN & METRO VIEWER */}
         {activeTab === '3d' && (
-          <div className="w-full h-full">
-            <ThreeTrainViewer
-              vehicle={(viewer3DVehicle && vehicles.find((v) => v.id === viewer3DVehicle.id)) || viewer3DVehicle || vehicles[0]}
-              onClose={() => setActiveTab('map')}
-              lang={lang}
-            />
-          </div>
+          <Station3DView network={network} station={station3D} vehicles={vehicles} now={now} lang={lang} onPickStation={(s) => setStation3D(s)} />
         )}
 
         {/* TAB 3: BARCELONA TOURIST ATTRACTIONS & LANDMARKS */}
