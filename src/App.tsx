@@ -272,8 +272,8 @@ export default function App() {
             onRouteFrom={(s) => planTrip({ from: stationPlace(s), to: null })}
             onRouteTo={(s) => planTrip({ to: stationPlace(s) })}
             onRouteToPlace={(p) => planTrip({ to: { kind: 'location', lat: p.lat, lng: p.lng, name: p.name } })}
-            onGoHome={() => goToFavorite(fav.home)}
-            onGoWork={() => goToFavorite(fav.work)}
+            onGoHome={(id) => goToFavorite(id ?? fav.home)}
+            onGoWork={(id) => goToFavorite(id ?? fav.work)}
             onAirport={() => planTrip({ airport: true })}
             onOpen3D={open3DStation}
             onOpenNotices={() => setActiveTab('notices')}

@@ -254,11 +254,17 @@ export const StationCard: React.FC<{
             <div key={`${first.lineCode}|${first.destination}`} className="px-2 py-1.5 rounded-xl bg-slate-950/60 flex items-center gap-2">
               <LineBadge code={first.lineCode} line={line} />
               <span className="flex-1 min-w-0 text-xs text-slate-200 truncate">→ {first.destination}</span>
-              {g.some((d) => d.isLastOfDay) && (
-                <span className="text-[9px] font-bold uppercase px-1 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                  {lang === 'en' ? 'last' : lang === 'ar' ? 'الأخير' : lang === 'ca' ? 'últim' : 'último'}
-                </span>
-              )}
+              {(() => {
+                // Mark the last departure before the service pause with its own time
+                const last = g.find((d) => d.isLastOfDay);
+                if (!last) return null;
+                return (
+                  <span className="text-[9px] font-bold uppercase px-1 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 whitespace-nowrap">
+                    {lang === 'en' ? 'last' : lang === 'ar' ? 'الأخير' : lang === 'ca' ? 'últim' : 'último'}
+                    {last !== first && last.departureTime ? ` ${last.departureTime}` : ''}
+                  </span>
+                );
+              })()}
               <span className="font-tech text-sm font-bold text-white tabular-nums" title={first.type === 'bus' && !first.isRealTime ? t.approxTime : undefined}>
                 {first.type === 'bus' && !first.isRealTime ? '≈ ' : ''}
                 {waitLabel(first.timeEstimateSeconds ?? 0, lang)}
