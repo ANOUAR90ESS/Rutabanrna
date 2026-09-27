@@ -6,6 +6,7 @@ import { formatClock, madridClock } from '../../services/network/clock';
 import { ui } from '../../i18n/ui';
 import type { Favorites, GeoState } from '../../hooks/useUserContext';
 import { StationCard, StationSearch } from './shared';
+import type { PlaceResult } from '../../services/geocode';
 
 const POPULAR = ['Catalunya', 'Passeig de Gràcia', 'Sants Estació', 'Espanya', 'Diagonal'];
 
@@ -23,6 +24,7 @@ interface NowViewProps {
   onOpenMap: (s: Station) => void;
   onRouteFrom: (s: Station) => void;
   onRouteTo: (s: Station) => void;
+  onRouteToPlace: (p: PlaceResult) => void;
   onGoHome: () => void;
   onGoWork: () => void;
   onAirport: () => void;
@@ -94,7 +96,7 @@ export const NowView: React.FC<NowViewProps> = (props) => {
           </button>
         </div>
 
-        <StationSearch network={network} lang={lang} onPick={props.onOpenMap} />
+        <StationSearch network={network} lang={lang} onPick={props.onOpenMap} onPickPlace={props.onRouteToPlace} />
 
         {/* Quick actions */}
         <div className="grid grid-cols-3 gap-2">

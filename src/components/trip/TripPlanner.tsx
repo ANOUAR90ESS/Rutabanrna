@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowUpDown, LocateFixed, Home, Briefcase, Star, Footprints, Accessibility, Bus, Loader2, Map as MapIcon, Bell, X, Plane, Clock } from 'lucide-react';
+import { ArrowUpDown, LocateFixed, Home, Briefcase, Star, Footprints, Accessibility, Bus, Loader2, Map as MapIcon, Bell, X, Plane, Clock, History } from 'lucide-react';
 import type { Language, Place } from '../../types/transit';
 import type { TmbNetwork } from '../../services/network/engine';
 import { Router, Journey, Leg, Seed } from '../../services/network/router';
@@ -7,6 +7,7 @@ import { formatClock, madridClock, ymdShift } from '../../services/network/clock
 import { fmt, ui } from '../../i18n/ui';
 import type { Favorites, GeoState } from '../../hooks/useUserContext';
 import { LineBadge, StationSearch } from '../now/shared';
+import { loadRecentPlaces } from '../../services/geocode';
 
 export type TimeMode = 'now' | 'depart' | 'arrive';
 
@@ -134,9 +135,12 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({ network, router, now, 
     add(fav.home, <Home className="w-3.5 h-3.5" />, t.home);
     add(fav.work, <Briefcase className="w-3.5 h-3.5" />, t.work);
     fav.starred.slice(0, 4).forEach((id) => add(id, <Star className="w-3.5 h-3.5" />));
+    loadRecentPlaces()
+      .slice(0, 3)
+      .forEach((p) => out.push({ icon: <History className="w-3.5 h-3.5" />, label: p.name, place: { kind: 'location', lat: p.lat, lng: p.lng, name: p.name } }));
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geo.status === 'ok', fav, network, lang]);
+  }, [geo.status === 'ok', fav, network, lang, from, to]);
 
   return (
     <div className="w-full h-full overflow-y-auto bg-slate-950">
@@ -316,7 +320,12 @@ const PlaceField: React.FC<{
       <div className="flex items-center gap-2">
         <span className="text-[10px] uppercase font-bold text-slate-500 w-14 shrink-0">{label}</span>
         <div className="flex-1">
-          <StationSearch network={network} lang={lang} onPick={(s) => onPick({ kind: 'station', stationId: s.id, name: s.name })} />
+          <StationSearch
+            network={network}
+            lang={lang}
+            onPick={(s) => onPick({ kind: 'station', stationId: s.id, name: s.name })}
+            onPickPlace={(p) => onPick({ kind: 'location', lat: p.lat, lng: p.lng, name: p.name })}
+          />
         </div>
       </div>
       <div className="flex gap-1.5 flex-wrap ps-16">

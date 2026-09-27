@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
-import { Search, Star, Home, Briefcase, Navigation, Box, ArrowRight, MoreVertical } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Search, Star, Home, Briefcase, Navigation, Box, ArrowRight, MoreVertical, MapPin, History, Landmark, Loader2, TrainFront } from 'lucide-react';
 import type { Language, Station, TransitLine } from '../../types/transit';
 import type { TmbNetwork } from '../../services/network/engine';
-import { normalizeText, walkSeconds } from '../../services/network/engine';
+import { distanceMetres, normalizeText, walkSeconds } from '../../services/network/engine';
 import { fmt, ui } from '../../i18n/ui';
 import type { Favorites } from '../../hooks/useUserContext';
+import { loadRecentPlaces, PlaceResult, rememberPlace, searchLandmarks, searchPlaces } from '../../services/geocode';
+import { BARCELONA_LANDMARKS } from '../../data/landmarksData';
 
 export const LineBadge: React.FC<{ code: string; line?: TransitLine; size?: 'sm' | 'md' }> = ({ code, line, size = 'sm' }) => (
   <span
@@ -23,17 +25,22 @@ export function waitLabel(secs: number, lang: Language): string {
   return `${Math.floor(secs / 60)} ${t.min}`;
 }
 
-/** Search box over all stations and stops (metro first). */
+/** Search box over stations and stops (metro first) and, optionally, addresses & places. */
 export const StationSearch: React.FC<{
   network: TmbNetwork;
   lang: Language;
   placeholder?: string;
   onPick: (s: Station) => void;
+  /** When set, addresses/places (OpenStreetMap), landmarks and recent places are offered too. */
+  onPickPlace?: (p: PlaceResult) => void;
   autoFocus?: boolean;
   metroOnly?: boolean;
-}> = ({ network, lang, placeholder, onPick, autoFocus, metroOnly }) => {
+}> = ({ network, lang, placeholder, onPick, onPickPlace, autoFocus, metroOnly }) => {
   const t = ui(lang);
   const [q, setQ] = useState('');
+  const [focused, setFocused] = useState(false);
+  const [places, setPlaces] = useState<PlaceResult[]>([]);
+  const [loading, setLoading] = useState(false);
   const index = useMemo(
     () => network.stations.filter((s) => !metroOnly || !s.isBusStop).map((s) => ({ s, n: normalizeText(s.name) })),
     [network, metroOnly]
@@ -44,9 +51,49 @@ export const StationSearch: React.FC<{
     return index
       .filter((x) => x.n.includes(v))
       .sort((a, b) => Number(!!a.s.isBusStop) - Number(!!b.s.isBusStop) || Number(!a.n.startsWith(v)) - Number(!b.n.startsWith(v)))
-      .slice(0, 8)
+      .slice(0, onPickPlace ? 5 : 8)
       .map((x) => x.s);
-  }, [q, index]);
+  }, [q, index, onPickPlace]);
+
+  // Online place search (debounced, cancelled on new input)
+  useEffect(() => {
+    if (!onPickPlace) return;
+    const v = q.trim();
+    if (v.length < 3) {
+      setPlaces([]);
+      setLoading(false);
+      return;
+    }
+    const ctrl = new AbortController();
+    setLoading(true);
+    const id = setTimeout(() => {
+      searchPlaces(v, lang, ctrl.signal)
+        .then((r) => !ctrl.signal.aborted && setPlaces(r))
+        .catch(() => undefined)
+        .finally(() => !ctrl.signal.aborted && setLoading(false));
+    }, 400);
+    return () => {
+      ctrl.abort();
+      clearTimeout(id);
+    };
+  }, [q, lang, onPickPlace]);
+
+  const localPlaces = useMemo(() => (onPickPlace ? searchLandmarks(q, BARCELONA_LANDMARKS, lang) : []), [q, lang, onPickPlace]);
+  const recents = useMemo(() => (onPickPlace && focused && q.length < 2 ? loadRecentPlaces() : []), [onPickPlace, focused, q]);
+  const placeList = [
+    ...localPlaces,
+    // skip OSM hits that are the same spot as a landmark we already show
+    ...places.filter((p) => !localPlaces.some((l) => distanceMetres([l.lat, l.lng], [p.lat, p.lng]) < 250))
+  ].slice(0, 6);
+
+  const pickPlace = (p: PlaceResult) => {
+    rememberPlace(p);
+    onPickPlace?.(p);
+    setQ('');
+    setFocused(false);
+  };
+
+  const open = q.length >= 2 || recents.length > 0;
 
   return (
     <div className="relative">
@@ -56,19 +103,28 @@ export const StationSearch: React.FC<{
           value={q}
           autoFocus={autoFocus}
           onChange={(e) => setQ(e.target.value)}
-          placeholder={placeholder || t.searchStation}
-          className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-sky-500 text-sm text-white placeholder-slate-500 outline-none"
+          onFocus={() => setFocused(true)}
+          onBlur={() => setTimeout(() => setFocused(false), 200)}
+          placeholder={placeholder || (onPickPlace ? t.searchPlace : t.searchStation)}
+          className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-sky-500 text-sm text-white placeholder-slate-500 outline-none"
         />
+        {loading && <Loader2 className="w-4 h-4 text-slate-500 absolute right-3 animate-spin" />}
       </div>
-      {q.length >= 2 && (
-        <div className="absolute z-40 mt-1 w-full rounded-xl bg-slate-900 border border-slate-700 shadow-2xl overflow-hidden">
-          {hits.length === 0 && <div className="px-3 py-2 text-xs text-slate-400">{t.noResults}</div>}
+      {open && (focused || q.length >= 2) && (
+        <div className="absolute z-40 mt-1 w-full rounded-xl bg-slate-900 border border-slate-700 shadow-2xl overflow-hidden max-h-[60vh] overflow-y-auto">
+          {recents.length > 0 && <SectionLabel icon={<History className="w-3 h-3" />} text={t.recentPlaces} />}
+          {recents.map((p) => (
+            <PlaceRow key={p.id} p={p} onClick={() => pickPlace(p)} />
+          ))}
+          {q.length >= 2 && hits.length > 0 && onPickPlace && <SectionLabel icon={<TrainFront className="w-3 h-3" />} text={t.stationsLabel} />}
           {hits.map((s) => (
             <button
               key={s.id}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 onPick(s);
                 setQ('');
+                setFocused(false);
               }}
               className="w-full text-left px-3 py-2 hover:bg-slate-800 flex items-center justify-between gap-2"
             >
@@ -80,11 +136,39 @@ export const StationSearch: React.FC<{
               </span>
             </button>
           ))}
+          {q.length >= 2 && placeList.length > 0 && <SectionLabel icon={<MapPin className="w-3 h-3" />} text={t.placesLabel} />}
+          {q.length >= 2 && placeList.map((p) => <PlaceRow key={p.id} p={p} onClick={() => pickPlace(p)} />)}
+          {q.length >= 2 && !loading && hits.length === 0 && placeList.length === 0 && (
+            <div className="px-3 py-2 text-xs text-slate-400">{onPickPlace && typeof navigator !== 'undefined' && !navigator.onLine ? t.placesOffline : t.noResults}</div>
+          )}
         </div>
       )}
     </div>
   );
 };
+
+const SectionLabel: React.FC<{ icon: React.ReactNode; text: string }> = ({ icon, text }) => (
+  <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+    {icon}
+    {text}
+  </div>
+);
+
+const PlaceRow: React.FC<{ p: PlaceResult; onClick: () => void }> = ({ p, onClick }) => (
+  <button onMouseDown={(e) => e.preventDefault()} onClick={onClick} className="w-full text-left px-3 py-2 hover:bg-slate-800 flex items-start gap-2">
+    {p.source === 'landmark' ? (
+      <Landmark className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+    ) : p.source === 'recent' ? (
+      <History className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+    ) : (
+      <MapPin className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+    )}
+    <span className="min-w-0">
+      <span className="block text-sm text-white truncate">{p.name}</span>
+      {p.detail && <span className="block text-[11px] text-slate-400 truncate">{p.detail}</span>}
+    </span>
+  </button>
+);
 
 /** Station card with live grouped departures: the core building block of the "Now" screen. */
 export const StationCard: React.FC<{

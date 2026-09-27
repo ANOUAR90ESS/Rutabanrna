@@ -251,6 +251,7 @@ export default function App() {
             onOpenMap={openStationOnMap}
             onRouteFrom={(s) => planTrip({ from: stationPlace(s), to: null })}
             onRouteTo={(s) => planTrip({ to: stationPlace(s) })}
+            onRouteToPlace={(p) => planTrip({ to: { kind: 'location', lat: p.lat, lng: p.lng, name: p.name } })}
             onGoHome={() => goToFavorite(fav.home)}
             onGoWork={() => goToFavorite(fav.work)}
             onAirport={() => planTrip({ airport: true })}
