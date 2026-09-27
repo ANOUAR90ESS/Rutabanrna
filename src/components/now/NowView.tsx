@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { LocateFixed, Home, Briefcase, Plane, Loader2, AlertTriangle } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { LocateFixed, Home, Briefcase, Plane, Loader2, AlertTriangle, X, Pencil } from 'lucide-react';
 import type { Language, ServiceNotice, Station } from '../../types/transit';
 import type { TmbNetwork } from '../../services/network/engine';
 import { formatClock, madridClock } from '../../services/network/clock';
@@ -25,8 +25,9 @@ interface NowViewProps {
   onRouteFrom: (s: Station) => void;
   onRouteTo: (s: Station) => void;
   onRouteToPlace: (p: PlaceResult) => void;
-  onGoHome: () => void;
-  onGoWork: () => void;
+  /** Plan a trip home/work (station id given when it was just chosen) */
+  onGoHome: (id?: string) => void;
+  onGoWork: (id?: string) => void;
   onAirport: () => void;
   onOpen3D: (s: Station) => void;
   onOpenNotices: () => void;
@@ -40,6 +41,7 @@ interface NowViewProps {
 export const NowView: React.FC<NowViewProps> = (props) => {
   const { network, now, lang, geo, onRequestLocation, fav, notices } = props;
   const t = ui(lang);
+  const [picking, setPicking] = useState<'home' | 'work' | null>(null);
   const clock = formatClock(madridClock(now).secs);
 
   // Recompute nearby stations only when the position changes noticeably.
@@ -105,11 +107,73 @@ export const NowView: React.FC<NowViewProps> = (props) => {
 
         {/* Quick actions */}
         <div className="grid grid-cols-3 gap-2">
-          <QuickAction icon={<Home className="w-4 h-4" />} label={t.goHome} onClick={props.onGoHome} disabled={!home} />
-          <QuickAction icon={<Briefcase className="w-4 h-4" />} label={t.goWork} onClick={props.onGoWork} disabled={!work} />
+          <QuickAction
+            icon={<Home className="w-4 h-4" />}
+            label={t.goHome}
+            sub={home?.name}
+            onClick={() => (home ? props.onGoHome() : setPicking('home'))}
+            onEdit={home ? () => setPicking('home') : undefined}
+          />
+          <QuickAction
+            icon={<Briefcase className="w-4 h-4" />}
+            label={t.goWork}
+            sub={work?.name}
+            onClick={() => (work ? props.onGoWork() : setPicking('work'))}
+            onEdit={work ? () => setPicking('work') : undefined}
+          />
           <QuickAction icon={<Plane className="w-4 h-4" />} label={t.airport} onClick={props.onAirport} />
         </div>
-        {!home && <p className="text-xs text-slate-400 -mt-2">{t.setHomeHint}</p>}
+        {picking && (
+          <div className="rounded-2xl bg-slate-900 border border-amber-500/40 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold text-white">{picking === 'home' ? t.pickHome : t.pickWork}</span>
+              <button onClick={() => setPicking(null)} className="text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <StationSearch
+              network={network}
+              lang={lang}
+              autoFocus
+              onPick={(s) => {
+                const which = picking;
+                setPicking(null);
+                if (which === 'home') {
+                  props.onSetHome(s.id);
+                  props.onGoHome(s.id);
+                } else {
+                  props.onSetWork(s.id);
+                  props.onGoWork(s.id);
+                }
+              }}
+            />
+            {nearby && nearby.metro.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {nearby.metro.map(({ station }) => (
+                  <button
+                    key={station.id}
+                    onClick={() => {
+                      const which = picking;
+                      setPicking(null);
+                      if (which === 'home') {
+                        props.onSetHome(station.id);
+                        props.onGoHome(station.id);
+                      } else {
+                        props.onSetWork(station.id);
+                        props.onGoWork(station.id);
+                      }
+                    }}
+                    className="px-2 py-1 rounded-lg bg-slate-800 text-[11px] text-slate-200"
+                  >
+                    {station.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="text-[11px] text-slate-400">{t.pickHint}</p>
+          </div>
+        )}
+        {!home && !picking && <p className="text-xs text-slate-400 -mt-2">{t.setHomeHint}</p>}
 
         {props.children}
 
@@ -164,15 +228,28 @@ export const NowView: React.FC<NowViewProps> = (props) => {
   );
 };
 
-const QuickAction: React.FC<{ icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean }> = ({ icon, label, onClick, disabled }) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    className="py-3 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-600 disabled:opacity-40 text-xs font-semibold text-slate-100 flex flex-col items-center gap-1"
-  >
-    <span className="text-amber-400">{icon}</span>
-    {label}
-  </button>
+const QuickAction: React.FC<{ icon: React.ReactNode; label: string; sub?: string; onClick: () => void; onEdit?: () => void }> = ({
+  icon,
+  label,
+  sub,
+  onClick,
+  onEdit
+}) => (
+  <div className="relative">
+    <button
+      onClick={onClick}
+      className="w-full py-3 px-1 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-600 text-xs font-semibold text-slate-100 flex flex-col items-center gap-0.5"
+    >
+      <span className="text-amber-400">{icon}</span>
+      {label}
+      {sub && <span className="text-[10px] font-normal text-slate-400 truncate max-w-full">{sub}</span>}
+    </button>
+    {onEdit && (
+      <button onClick={onEdit} className="absolute top-1 right-1 p-1 rounded-lg text-slate-500 hover:text-white" aria-label="edit">
+        <Pencil className="w-3 h-3" />
+      </button>
+    )}
+  </div>
 );
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
