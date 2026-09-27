@@ -17,6 +17,10 @@ Tiempo real TMB opcional: registra la app en [developer.tmb.cat](https://develop
 
 Búsqueda de direcciones: el texto buscado se envía a los servicios públicos de OpenStreetMap (Photon y, si falla, Nominatim); se pueden usar instancias propias con `VITE_PHOTON_URL` / `VITE_NOMINATIM_URL`.
 
+**App Android:** el mismo código empaquetado con Capacitor; GitHub Actions compila el APK en cada push (avisos nativos con la app cerrada, horarios dentro del APK). Ver [`docs/ANDROID.md`](docs/ANDROID.md).
+
+**Despliegue web en Vercel:** `vercel.json` + función `api/tmb.js` (proxy de tiempo real con claves en el servidor).
+
 Plan y estado del trabajo: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Desarrollo
@@ -49,6 +53,8 @@ Los datos incluidos son válidos del **21/09/2026 al 31/12/2026**.
 | `src/services/geocode.ts` | Búsqueda de direcciones y lugares (Photon → Nominatim, datos OpenStreetMap), monumentos sin conexión y lugares recientes. |
 | `src/services/departureAlerts.ts` | Avisos «sal ahora» sobre salidas reales. |
 | `src/components/now/`, `trip/`, `alerts/`, `station3d/` | Pantallas Ahora, Ruta, Avisos y Estación 3D. |
+| `api/tmb.js`, `lib/tmbProxy.mjs`, `vercel.json` | Despliegue en Vercel: función proxy de iTransit (lista blanca, caché 15 s en el edge, CORS para la app Android). |
+| `android/`, `capacitor.config.ts`, `src/native/` | App Android (Capacitor): notificaciones nativas de avisos, botón atrás, barra de estado. |
 | `server/index.mjs` | Servidor de producción: sirve `dist/` y hace de proxy a iTransit con las claves en el servidor (solo endpoints permitidos). |
 | `src/components/legal/` | Atribución de fuentes y fechas, aviso de datos caducados, página «Fuentes y aviso legal». |
 | `src/hooks/useTmbNetwork.ts` | Carga la red (red → caché offline) y el reloj de la UI. |
