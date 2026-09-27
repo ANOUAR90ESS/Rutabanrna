@@ -1,17 +1,86 @@
 import React from 'react';
-import { MapPin, Globe, Bell, Compass, Train, AlertTriangle, Layers, DownloadCloud, Sliders, Landmark } from 'lucide-react';
-import { Language } from '../types/transit';
+import { MapPin, Globe, Bell, Compass, Train, AlertTriangle, Layers, DownloadCloud, Sliders, Landmark, Clock, Route, Box, MoreHorizontal } from 'lucide-react';
+import { AppTab, Language } from '../types/transit';
 import { translations } from '../i18n/translations';
+import { ui } from '../i18n/ui';
+
+export function navItems(lang: Language, alertsCount = 0) {
+  const t = translations[lang];
+  const u = ui(lang);
+  return [
+    { id: 'now' as AppTab, label: u.tabNow, icon: <Clock className="w-4 h-4 text-amber-400" />, primary: true },
+    { id: 'trip' as AppTab, label: u.tabTrip, icon: <Route className="w-4 h-4 text-emerald-400" />, primary: true },
+    { id: 'map' as AppTab, label: u.tabMap, icon: <Compass className="w-4 h-4 text-sky-400" />, primary: true },
+    { id: 'lines' as AppTab, label: u.tabLines, icon: <Layers className="w-4 h-4 text-amber-400" />, primary: true },
+    { id: '3d' as AppTab, label: u.view3d, icon: <Box className="w-4 h-4 text-rose-400" /> },
+    { id: 'alerts' as AppTab, label: t.myAlerts, icon: <Bell className="w-4 h-4 text-emerald-400" />, badge: alertsCount },
+    { id: 'notices' as AppTab, label: t.serviceNotices, icon: <AlertTriangle className="w-4 h-4 text-amber-400" /> },
+    { id: 'landmarks' as AppTab, label: t.landmarks, icon: <Landmark className="w-4 h-4 text-rose-400" /> }
+  ];
+}
+
+/** Mobile bottom tab bar (the top nav links are hidden below `lg`). */
+export const BottomNav: React.FC<{ activeTab: AppTab; setActiveTab: (t: AppTab) => void; lang: Language; alertsCount: number }> = ({
+  activeTab,
+  setActiveTab,
+  lang,
+  alertsCount
+}) => {
+  const [more, setMore] = React.useState(false);
+  const items = navItems(lang, alertsCount);
+  const primary = items.filter((i) => i.primary);
+  const secondary = items.filter((i) => !i.primary);
+  const inSecondary = secondary.some((i) => i.id === activeTab);
+  return (
+    <>
+      {more && (
+        <div className="lg:hidden fixed inset-0 z-40" onClick={() => setMore(false)}>
+          <div className="absolute bottom-16 right-2 left-2 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-2 grid grid-cols-2 gap-1" onClick={(e) => e.stopPropagation()}>
+            {secondary.map((i) => (
+              <button
+                key={i.id}
+                onClick={() => {
+                  setActiveTab(i.id);
+                  setMore(false);
+                }}
+                className={`px-3 py-3 rounded-xl flex items-center gap-2 text-sm ${activeTab === i.id ? 'bg-slate-800 text-white' : 'text-slate-300'}`}
+              >
+                {i.icon}
+                <span className="truncate">{i.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 h-16 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 grid grid-cols-5 pb-[env(safe-area-inset-bottom)]">
+        {primary.map((i) => (
+          <button
+            key={i.id}
+            onClick={() => setActiveTab(i.id)}
+            className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${activeTab === i.id ? 'text-white' : 'text-slate-500'}`}
+          >
+            {i.icon}
+            {i.label}
+          </button>
+        ))}
+        <button
+          onClick={() => setMore(!more)}
+          className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${inSecondary || more ? 'text-white' : 'text-slate-500'}`}
+        >
+          <MoreHorizontal className="w-4 h-4" />
+          {ui(lang).tabMore}
+        </button>
+      </nav>
+    </>
+  );
+};
 
 interface TopNavProps {
-  activeTab: 'map' | '3d' | 'landmarks' | 'lines' | 'alerts' | 'notices';
-  setActiveTab: (tab: 'map' | '3d' | 'landmarks' | 'lines' | 'alerts' | 'notices') => void;
+  activeTab: AppTab;
+  setActiveTab: (tab: AppTab) => void;
   lang: Language;
   setLang: (lang: Language) => void;
-  currentCityName: string;
-  onOpenCityModal: () => void;
   onOpenNewAlert: () => void;
-  onOpenNotificationSettings: () => void;
   onOpenOfflineManager: () => void;
   activeAlertsCount: number;
   isOffline: boolean;
@@ -23,10 +92,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   setActiveTab,
   lang,
   setLang,
-  currentCityName,
-  onOpenCityModal,
   onOpenNewAlert,
-  onOpenNotificationSettings,
   onOpenOfflineManager,
   activeAlertsCount,
   isOffline,
@@ -42,7 +108,7 @@ export const TopNav: React.FC<TopNavProps> = ({
           href="#"
           onClick={(e) => {
             e.preventDefault();
-            setActiveTab('map');
+            setActiveTab('now');
           }}
           className="text-lg lg:text-xl font-extrabold tracking-tight text-white flex items-center gap-2 group"
         >
@@ -51,103 +117,35 @@ export const TopNav: React.FC<TopNavProps> = ({
               <Train className="w-4 h-4 text-amber-400" />
             </div>
           </div>
-          <span className="font-tech tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-slate-400">
+          <span className="hidden sm:inline font-tech tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-slate-400">
             {t.appTitle}
           </span>
         </a>
 
-        {/* City Switcher Trigger */}
-        <button
-          onClick={onOpenCityModal}
-          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs font-semibold text-slate-300 hover:text-white transition-all shadow-sm"
-        >
-          <MapPin className="w-3 h-3 text-rose-400" />
-          <span className="max-w-[80px] truncate">{currentCityName}</span>
-          <span className="text-[10px] text-emerald-400 ml-0.5 font-mono">LIVE</span>
-        </button>
+
       </div>
 
       {/* Zone 2: 4-6 Clean Text Nav Links with Active Indicator */}
       <nav className="hidden lg:flex items-center gap-1 text-sm font-medium">
-        <button
-          onClick={() => setActiveTab('map')}
-          className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'map'
-              ? 'text-white bg-slate-800/90 shadow-sm border border-slate-700/60'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-          }`}
-        >
-          <Compass className="w-4 h-4 text-sky-400" />
-          <span>{t.liveMap}</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('3d')}
-          className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap ${
-            activeTab === '3d'
-              ? 'text-white bg-slate-800/90 shadow-sm border border-slate-700/60'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-          }`}
-        >
-          <div className="w-4 h-4 rounded bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-[10px]">
-            3D
-          </div>
-          <span>{t.view3D}</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('landmarks')}
-          className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'landmarks'
-              ? 'text-white bg-slate-800/90 shadow-sm border border-slate-700/60'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-          }`}
-        >
-          <Landmark className="w-4 h-4 text-rose-400" />
-          <span>{t.landmarks}</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('lines')}
-          className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'lines'
-              ? 'text-white bg-slate-800/90 shadow-sm border border-slate-700/60'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-          }`}
-        >
-          <Layers className="w-4 h-4 text-amber-400" />
-          <span>{t.linesSchedules}</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('alerts')}
-          className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'alerts'
-              ? 'text-white bg-slate-800/90 shadow-sm border border-slate-700/60'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-          }`}
-        >
-          <Bell className="w-4 h-4 text-emerald-400" />
-          <span>{t.myAlerts}</span>
-          {activeAlertsCount > 0 && (
-            <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] flex items-center justify-center border border-emerald-500/40">
-              {activeAlertsCount}
-            </span>
-          )}
-        </button>
-
-        <button
-          onClick={() => setActiveTab('notices')}
-          className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'notices'
-              ? 'text-white bg-slate-800/90 shadow-sm border border-slate-700/60'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-          }`}
-        >
-          <AlertTriangle className="w-4 h-4 text-amber-400" />
-          <span className="hidden xl:inline">{t.serviceNotices}</span>
-          <span className="xl:hidden">Avisos</span>
-        </button>
+        {navItems(lang, activeAlertsCount).map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id)}
+            className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap ${
+              activeTab === item.id
+                ? 'text-white bg-slate-800/90 shadow-sm border border-slate-700/60'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+            {item.badge ? (
+              <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] flex items-center justify-center border border-emerald-500/40">
+                {item.badge}
+              </span>
+            ) : null}
+          </button>
+        ))}
       </nav>
 
       {/* Zone 3: Primary Actions (Offline Manager, Settings, Language, New Alert) */}
@@ -169,14 +167,7 @@ export const TopNav: React.FC<TopNavProps> = ({
           {isOfflineDownloaded && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>}
         </button>
 
-        {/* Notification Settings Button */}
-        <button
-          onClick={onOpenNotificationSettings}
-          title={t.customizeAlerts}
-          className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors"
-        >
-          <Sliders className="w-4 h-4" />
-        </button>
+
 
         {/* Language Selector Dropdown */}
         <div className="relative flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5">
@@ -186,10 +177,10 @@ export const TopNav: React.FC<TopNavProps> = ({
             onChange={(e) => setLang(e.target.value as Language)}
             className="bg-transparent text-xs font-semibold text-slate-200 pr-2 py-1 outline-none cursor-pointer"
           >
-            <option value="es" className="bg-slate-900 text-white">Español (ES)</option>
-            <option value="en" className="bg-slate-900 text-white">English (EN)</option>
-            <option value="ca" className="bg-slate-900 text-white">Català (CA)</option>
-            <option value="ar" className="bg-slate-900 text-white">العربية (AR)</option>
+            <option value="es" className="bg-slate-900 text-white">ES</option>
+            <option value="en" className="bg-slate-900 text-white">EN</option>
+            <option value="ca" className="bg-slate-900 text-white">CA</option>
+            <option value="ar" className="bg-slate-900 text-white">AR</option>
           </select>
         </div>
 

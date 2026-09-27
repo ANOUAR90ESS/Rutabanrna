@@ -124,9 +124,10 @@ export class TmbNetwork {
         lng: st.lon,
         lines: st.r.map((r) => raw.routes[r].n),
         hasAccessibleAccess: stops.every((s) => s.w === 1),
-        hasElevator: stops.some((s) => s.e > 0),
+        hasElevator: st.ac ? st.ac.some((a) => a[4] > 0) : stops.some((s) => s.e > 0),
         isBusStop: st.b === 1,
-        stopCodes: stops.map((s) => s.c)
+        stopCodes: stops.map((s) => s.c),
+        accesses: st.ac?.map(([name, lat, lng, a, e]) => ({ name, lat, lng, accessible: a === 1, elevators: e }))
       };
     });
     this.stations.forEach((s, i) => this.stationById.set(s.id, i));
@@ -402,7 +403,7 @@ export class TmbNetwork {
       if (!future.length || future[0] - c.secs > 60 * 60) {
         if (running) return;
         const next = future[0] !== undefined ? formatClock(future[0]) : null;
-        notices.push(makeNotice(`closed-${r.n}`, r.n, 'works', 'medium', noticeText.closed(r.n, next)));
+        notices.push(makeNotice(`closed-${r.n}`, r.n, 'info', 'low', noticeText.closed(r.n, next)));
         return;
       }
       const last = lastOfNight(future);
@@ -412,6 +413,102 @@ export class TmbNetwork {
       }
     });
     return notices;
+  }
+
+  /** Stations within `radius` metres, closest first. */
+  nearbyStations(lat: number, lng: number, opts: { radius?: number; bus?: boolean; limit?: number } = {}): { station: Station; metres: number }[] {
+    const radius = opts.radius ?? 800;
+    const out: { station: Station; metres: number }[] = [];
+    for (const s of this.stations) {
+      if (opts.bus !== undefined && !!s.isBusStop !== opts.bus) continue;
+      if (Math.abs(s.lat - lat) > 0.02 || Math.abs(s.lng - lng) > 0.03) continue;
+      const d = metres([lat, lng], [s.lat, s.lng]);
+      if (d <= radius) out.push({ station: s, metres: d });
+    }
+    return out.sort((a, b) => a.metres - b.metres).slice(0, opts.limit ?? 5);
+  }
+
+  /** Geometry of a station for the 3D view: platforms with their track, interchanges, entrances. */
+  stationLayout(stationId: string) {
+    const si = this.stationById.get(stationId);
+    if (si === undefined) return null;
+    const st = this.raw.stations[si];
+    const station = this.stations[si];
+    const pointAt = (sh: Shape, d: number): [number, number] => {
+      let lo = upper(sh.cum, d) - 1;
+      lo = Math.max(0, Math.min(sh.pts.length - 2, lo));
+      const seg = sh.cum[lo + 1] - sh.cum[lo] || 1;
+      const g = Math.max(0, Math.min(1, (d - sh.cum[lo]) / seg));
+      const A = sh.pts[lo], B = sh.pts[lo + 1];
+      return [A[0] + (B[0] - A[0]) * g, A[1] + (B[1] - A[1]) * g];
+    };
+    const platforms = st.s.map((stopIndex) => {
+      const stop = this.raw.stops[stopIndex];
+      // longest pattern through this stop, with a shape
+      const pi = this.stopPatterns[stopIndex]
+        .filter((i) => this.patterns[i].sh >= 0 && this.patterns[i].k.length === this.patterns[i].s.length)
+        .sort((a, b) => this.patterns[b].s.length - this.patterns[a].s.length)[0];
+      const route = this.routes[stop.r[0]];
+      let track: [number, number][] = [];
+      let dir: [number, number] = [stop.lat + 0.0003, stop.lon];
+      if (pi !== undefined) {
+        const p = this.patterns[pi];
+        const sh = this.shapes[p.sh];
+        const d = p.k[p.pos.get(stopIndex)!];
+        const a = Math.max(0, d - 450), b = Math.min(sh.cum[sh.cum.length - 1], d + 450);
+        track = [pointAt(sh, a), ...sh.pts.filter((_, i) => sh.cum[i] > a && sh.cum[i] < b), pointAt(sh, b)];
+        dir = pointAt(sh, Math.min(b, d + 40));
+        const back = pointAt(sh, Math.max(a, d - 40));
+        return { stopIndex, lineCode: route.n, color: route.c, lat: stop.lat, lng: stop.lon, accessible: stop.w === 1, dirFrom: back, dirTo: dir, track };
+      }
+      return { stopIndex, lineCode: route.n, color: route.c, lat: stop.lat, lng: stop.lon, accessible: stop.w === 1, dirFrom: [stop.lat, stop.lon] as [number, number], dirTo: dir, track };
+    });
+    const set = new Set(st.s);
+    const interchanges = (this.raw.x || [])
+      .filter(([a, b]) => set.has(a) && set.has(b))
+      .map(([a, b, secs]) => ({ from: this.routes[this.raw.stops[a].r[0]].n, to: this.routes[this.raw.stops[b].r[0]].n, a, b, secs }));
+    return { station, center: [st.lat, st.lon] as [number, number], platforms, interchanges, accesses: station.accesses ?? [] };
+  }
+
+  /** Station that contains the given stop (platform) index. */
+  stationList(stopIndex: number): Station {
+    return this.stations[this.raw.stops[stopIndex].g];
+  }
+
+  getStation(id: string): Station | undefined {
+    const i = this.stationById.get(id);
+    return i === undefined ? undefined : this.stations[i];
+  }
+
+  /** Line + direction pairs that depart from a station (for alert set-up). */
+  directionsAt(stationId: string): { lineCode: string; headsign: string }[] {
+    const si = this.stationById.get(stationId);
+    if (si === undefined) return [];
+    const seen = new Map<string, { lineCode: string; headsign: string; r: number }>();
+    for (const s of this.raw.stations[si].s) {
+      for (const pi of this.stopPatterns[s]) {
+        const p = this.patterns[pi];
+        if (p.pos.get(s)! >= p.s.length - 1) continue;
+        const key = `${p.r}|${p.h}`;
+        if (!seen.has(key)) seen.set(key, { lineCode: this.routes[p.r].n, headsign: p.h, r: p.r });
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.r - b.r || a.headsign.localeCompare(b.headsign)).map(({ lineCode, headsign }) => ({ lineCode, headsign }));
+  }
+
+  /** Next departures grouped by line + direction (for compact cards). */
+  departureGroups(stationId: string, ms: number, perGroup = 3) {
+    const deps = this.departuresAt(stationId, ms, perGroup);
+    const groups = new Map<string, Departure[]>();
+    deps.forEach((d) => {
+      const k = `${d.lineCode}|${d.destination}`;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k)!.push(d);
+    });
+    return [...groups.values()].sort((a, b) => {
+      const la = this.lineIndexByCode.get(a[0].lineCode) ?? 999, lb = this.lineIndexByCode.get(b[0].lineCode) ?? 999;
+      return la - lb || (a[0].timeEstimateSeconds ?? 0) - (b[0].timeEstimateSeconds ?? 0);
+    });
   }
 
   nearestStation(lat: number, lng: number, opts: { metroOnly?: boolean } = {}): Station | null {
@@ -428,6 +525,19 @@ export class TmbNetwork {
     for (let i = 0; i < 7; i++) { const d = ymdShift(ymd, i); if (this.raw.dates[d]) return d; }
     return null;
   }
+}
+
+/** Walking time estimate: straight-line distance × 1.3 detour at 1.25 m/s. */
+export function walkSeconds(m: number): number {
+  return Math.round((m * 1.3) / 1.25);
+}
+
+export function distanceMetres(a: [number, number], b: [number, number]): number {
+  return metres(a, b);
+}
+
+export function normalizeText(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[·|.'’\-]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 export function lastOfNight(times: number[]): number {

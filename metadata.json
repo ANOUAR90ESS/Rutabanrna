@@ -1,6 +1,8 @@
 {
-  "name": "BarnaTransit 3D - Live Metro, Trains & Buses",
-  "description": "Real-time interactive transit map for Barcelona with live trains, metro, buses, 3D train simulations, and personalized journey alerts in Spanish and English.",
+  "name": "BarnaTransit — Metro y Bus TMB",
+  "description": "Barcelona TMB metro & bus: nearby departures, journey planner (step-free), last train home, airport mode, leave-now alerts and 3D stations, from the official GTFS timetable.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

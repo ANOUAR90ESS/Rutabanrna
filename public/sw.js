@@ -1,6 +1,6 @@
 // BarnaTransit service worker: works offline with the official TMB timetable.
 // Bump VERSION whenever public/data/tmb-network.json is regenerated from a new GTFS feed.
-const VERSION = 'bt-v1-gtfs-20260921';
+const VERSION = 'bt-v2-gtfs-20260921';
 const DATA_CACHE = 'tmb-network-data'; // shared with src/services/offlineStorage.ts
 const DATA_URL = '/data/tmb-network.json';
 const CORE = ['/', '/index.html', '/manifest.json', '/icon.svg'];

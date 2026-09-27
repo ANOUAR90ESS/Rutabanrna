@@ -117,6 +117,7 @@ const calendar = readCsv(dir, 'calendar.txt');
 const calendarDates = readCsv(dir, 'calendar_dates.txt');
 const frequencies = readCsv(dir, 'frequencies.txt');
 const pathways = readCsv(dir, 'pathways.txt');
+const transfersCsv = readCsv(dir, 'transfers.txt');
 
 // Routes ---------------------------------------------------------------
 const kindOf = (r) => (r.route_type === '1' ? 'metro' : r.route_type === '7' ? 'funicular' : 'bus');
@@ -142,14 +143,23 @@ const routes = routesCsv.map((r) => ({
 
 // Elevators per metro station code (TMB open data "accessos_estacio_linia")
 const elevators = new Map();
-const accessibleAccess = new Map();
+const accessesByCode = new Map(); // station code -> [{c, n, lat, lon, a, e}]
 if (fs.existsSync(ACCESS_SRC)) {
   const acc = JSON.parse(fs.readFileSync(ACCESS_SRC, 'utf8'));
   for (const f of acc.features) {
     const p = f.properties;
     const code = String(p.CODI_ESTACIO);
     elevators.set(code, (elevators.get(code) || 0) + (p.NUM_ASCENSORS || 0));
-    if (p.ID_TIPUS_ACCESSIBILITAT === 1) accessibleAccess.set(code, (accessibleAccess.get(code) || 0) + 1);
+    if (!accessesByCode.has(code)) accessesByCode.set(code, []);
+    const [lon, lat] = f.geometry.coordinates;
+    accessesByCode.get(code).push({
+      c: String(p.CODI_ACCES),
+      n: p.NOM_ACCES,
+      lat: +lat.toFixed(6),
+      lon: +lon.toFixed(6),
+      a: p.ID_TIPUS_ACCESSIBILITAT === 1 ? 1 : 0,
+      e: p.NUM_ASCENSORS || 0
+    });
   }
 }
 const elevatorPathways = new Map();
@@ -377,21 +387,45 @@ const outShapes = shapes.map((pts) => {
   return o;
 });
 
+// Interchanges between platforms (transfers.txt + pathways "Correspondència"): [fromStop, toStop, seconds]
+const xfer = new Map();
+const addX = (a, b, secs) => {
+  const i = stopIdx.get(a), j = stopIdx.get(b);
+  if (i === undefined || j === undefined || i === j || !Number.isFinite(secs)) return;
+  const key = i + ',' + j;
+  xfer.set(key, Math.max(xfer.get(key) || 0, secs));
+};
+for (const t of transfersCsv) addX(t.from_stop_id, t.to_stop_id, +t.min_transfer_time || 120);
+for (const p of pathways) if (p.pathway_mode === '2' && stopIdx.has(p.from_stop_id) && stopIdx.has(p.to_stop_id)) {
+  addX(p.from_stop_id, p.to_stop_id, +p.traversal_time);
+  if (p.is_bidirectional === '1') addX(p.to_stop_id, p.from_stop_id, +p.traversal_time);
+}
+const outX = [...xfer].map(([k, v]) => [...k.split(',').map(Number), v]);
+
 const out = {
   v: 1,
   feed: { publisher: feedInfo.feed_publisher_name || 'TMB', version: feedInfo.feed_version || '', start: feedStart, end: feedEnd },
   generated: new Date().toISOString(),
   routes,
-  stations: stations.map((s) => ({ n: s.n, lat: s.lat, lon: s.lon, b: s.b, s: s.s, r: s.r })),
+  stations: stations.map((s) => {
+    const o = { n: s.n, lat: s.lat, lon: s.lon, b: s.b, s: s.s, r: s.r };
+    // Street entrances (TMB open data): [name, lat, lon, accessible 0/1, elevators], shared ones de-duplicated
+    const seen = new Map();
+    for (const si of s.s) for (const a of accessesByCode.get(stops[si].c) || []) if (!seen.has(a.c)) seen.set(a.c, a);
+    if (seen.size) o.ac = [...seen.values()].sort((x, y) => y.a - x.a || x.n.localeCompare(y.n)).map((a) => [a.n, a.lat, a.lon, a.a, a.e]);
+    return o;
+  }),
   stops: stops.map((s) => ({ id: s.id, c: s.c, g: s.g, lat: +s.lat.toFixed(6), lon: +s.lon.toFixed(6), w: s.w, e: s.e, r: s.r })),
   shapes: outShapes,
   patterns,
   services: outServices,
-  dates: outDates
+  dates: outDates,
+  x: outX
 };
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, JSON.stringify(out));
 const size = fs.statSync(OUT).size;
+console.log(`interchanges=${outX.length}`);
 console.log(`routes=${routes.length} stations=${stations.length} stops=${stops.length} shapes=${shapes.length} patterns=${patterns.length} services=${outServices.length} dates=${Object.keys(outDates).length}`);
 console.log(`Wrote ${path.relative(ROOT, OUT)} (${(size / 1024 / 1024).toFixed(2)} MB)`);

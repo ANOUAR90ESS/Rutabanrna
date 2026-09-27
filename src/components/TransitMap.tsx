@@ -2,10 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { TransitLine, LiveVehicle, Station, TransitType, Language, PointOfInterest } from '../types/transit';
 import { translations } from '../i18n/translations';
+import type { JourneySegment } from '../services/network/router';
 
 interface TransitMapProps {
   lines: TransitLine[];
   stations: Station[];
+  journey?: JourneySegment[] | null;
+  onClearJourney?: () => void;
   vehicles: LiveVehicle[];
   landmarks: PointOfInterest[];
   showLandmarks: boolean;
@@ -30,6 +33,8 @@ const BUS_DETAIL_ZOOM = 15;
 export const TransitMap: React.FC<TransitMapProps> = ({
   lines,
   stations,
+  journey,
+  onClearJourney,
   vehicles,
   landmarks,
   showLandmarks,
@@ -53,6 +58,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
   const stationsLayerRef = useRef<L.LayerGroup | null>(null);
   const landmarksLayerRef = useRef<L.LayerGroup | null>(null);
   const vehiclesLayerRef = useRef<L.LayerGroup | null>(null);
+  const journeyLayerRef = useRef<L.LayerGroup | null>(null);
   const vehicleMarkersRef = useRef(new Map<string, { marker: L.Marker; key: string }>());
   const vehicleDataRef = useRef(new Map<string, LiveVehicle>());
   const [view, setView] = useState<{ zoom: number; bounds: L.LatLngBounds | null }>({ zoom: 13, bounds: null });
@@ -89,6 +95,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     polylinesLayerRef.current = L.layerGroup().addTo(map);
     stationsLayerRef.current = L.layerGroup().addTo(map);
     landmarksLayerRef.current = L.layerGroup().addTo(map);
+    journeyLayerRef.current = L.layerGroup().addTo(map);
     vehiclesLayerRef.current = L.layerGroup().addTo(map);
 
     return () => {
@@ -209,7 +216,26 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       marker.bindTooltip(tooltipHtml(station), tooltipOpts);
       stationsLayerRef.current?.addLayer(marker);
     });
-  }, [lines, stations, selectedType, searchQuery, selectedStation, busDetail, singleLine, view]);
+
+    // Street entrances of the selected station (blue = step-free, grey = stairs only)
+    selectedStation?.accesses?.forEach((acc) => {
+      const dot = L.circleMarker([acc.lat, acc.lng], {
+        radius: 6,
+        color: '#ffffff',
+        weight: 2,
+        fillColor: acc.accessible ? '#0ea5e9' : '#64748b',
+        fillOpacity: 1
+      });
+      dot.bindTooltip(
+        `<div class="font-sans px-1 py-0.5"><div class="font-bold text-xs text-white">${esc(acc.name)}</div>` +
+          `<div class="text-[10px] ${acc.accessible ? 'text-sky-300' : 'text-slate-400'}">${esc(
+            acc.accessible ? t.accessibleEntrance : t.notAccessibleEntrance
+          )}${acc.elevators ? ` · ${acc.elevators} ${esc(t.elevatorShort)}` : ''}</div></div>`,
+        tooltipOpts
+      );
+      stationsLayerRef.current?.addLayer(dot);
+    });
+  }, [lines, stations, selectedType, searchQuery, selectedStation, busDetail, singleLine, view, t]);
 
   // Update Landmarks Layer
   useEffect(() => {
@@ -369,6 +395,26 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     });
   }, [vehicles, lines, selectedType, searchQuery, busDetail, singleLine, view, t]);
 
+  // Planned journey overlay
+  useEffect(() => {
+    const map = mapInstanceRef.current, layer = journeyLayerRef.current;
+    if (!map || !layer) return;
+    layer.clearLayers();
+    if (!journey || !journey.length) return;
+    const all: [number, number][] = [];
+    journey.forEach((seg) => {
+      all.push(...seg.points);
+      if (!seg.dashed) layer.addLayer(L.polyline(seg.points, { color: '#ffffff', weight: 11, opacity: 0.9, interactive: false }));
+      layer.addLayer(
+        L.polyline(seg.points, { color: seg.color, weight: seg.dashed ? 4 : 7, opacity: 1, dashArray: seg.dashed ? '2 8' : undefined, interactive: false })
+      );
+      [seg.points[0], seg.points[seg.points.length - 1]].forEach((p) =>
+        layer.addLayer(L.circleMarker(p, { radius: 5, color: '#0f172a', weight: 2, fillColor: '#ffffff', fillOpacity: 1, interactive: false }))
+      );
+    });
+    map.fitBounds(L.latLngBounds(all).pad(0.15), { maxZoom: 16 });
+  }, [journey]);
+
   // Pan to selected station or vehicle
   useEffect(() => {
     if (!mapInstanceRef.current) return;
@@ -386,6 +432,15 @@ export const TransitMap: React.FC<TransitMapProps> = ({
   return (
     <div className="relative w-full h-full">
       <div ref={mapContainerRef} className="w-full h-full z-0" />
+
+      {journey && journey.length > 0 && onClearJourney && (
+        <button
+          onClick={onClearJourney}
+          className="absolute top-44 right-4 z-20 px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-700 text-xs font-semibold text-white shadow-xl"
+        >
+          ✕ {translations[lang].close ?? 'Cerrar'}
+        </button>
+      )}
 
       {/* Floating Map Controls (Landmarks toggle & Layer info) */}
       <div className="absolute bottom-6 right-4 z-20 flex flex-col items-end gap-2">

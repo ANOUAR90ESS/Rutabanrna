@@ -64,3 +64,17 @@
 .animate-radar {
   animation: radar-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
+
+/* 3D station labels (CSS2DRenderer) */
+.s3d-plat, .s3d-acc, .s3d-ic, .s3d-train {
+  font: 600 11px 'Plus Jakarta Sans', system-ui, sans-serif;
+  padding: 2px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+  color: #fff;
+}
+.s3d-plat { background: var(--c); font-weight: 800; }
+.s3d-acc { background: rgba(15, 23, 42, 0.85); border: 1px solid #475569; color: #cbd5e1; }
+.s3d-acc-ok { border-color: #38bdf8; color: #e0f2fe; }
+.s3d-ic { background: rgba(120, 53, 15, 0.85); border: 1px solid #fbbf24; color: #fef3c7; }
+.s3d-train { background: var(--c); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6); font-weight: 800; }
