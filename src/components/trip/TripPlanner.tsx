@@ -214,7 +214,7 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({ network, router, now, 
                       </React.Fragment>
                     ))}
                     <span className={`ml-auto text-xs font-semibold ${leaveIn < 300 ? 'text-amber-300' : 'text-emerald-300'}`}>
-                      {leaveIn <= 30 ? t.alertLeave : leaveIn < 3600 ? fmt(t.leaveIn, `${Math.round(leaveIn / 60)} ${t.min}`) : fmt(t.leaveAt, secsToHHMM(j.dep))}
+                      {leaveIn <= 30 ? t.alertLeave : leaveIn < 3600 ? fmt(t.leaveIn, `${Math.round(leaveIn / 60)} ${t.min}`) : fmt(t.leaveAt, `${j.ymd !== clock.ymd || j.dep >= 86400 + 4 * 3600 ? `${t.tomorrow} ` : ''}${secsToHHMM(j.dep)}`)}
                     </span>
                   </div>
                 </button>

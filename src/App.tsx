@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { TopNav, BottomNav } from './components/TopNav';
 import { NowView } from './components/now/NowView';
 import { TripPlanner, TripRequest } from './components/trip/TripPlanner';
+import { AirportPanel } from './components/trip/AirportPanel';
+import { LastTrainCard } from './components/now/LastTrainCard';
 import { useFavorites, useGeolocation } from './hooks/useUserContext';
 import { Router, Journey, journeyGeometry, JourneySegment } from './services/network/router';
 import { TransitMap } from './components/TransitMap';
@@ -421,7 +423,19 @@ export default function App() {
               setActiveTab('3d');
             }}
             onOpenNotices={() => setActiveTab('notices')}
-          />
+          >
+            {router && (
+              <LastTrainCard
+                network={network}
+                router={router}
+                now={now}
+                lang={lang}
+                geo={geo}
+                homeId={fav.home}
+                onOpen={() => goToFavorite(fav.home)}
+              />
+            )}
+          </NowView>
         )}
 
         {/* TAB: TRIP PLANNER */}
@@ -436,6 +450,7 @@ export default function App() {
             fav={fav}
             request={tripRequest}
             onShowOnMap={handleShowJourney}
+            airportPanel={(apply) => <AirportPanel network={network} lang={lang} homeId={fav.home} apply={apply} />}
           />
         )}
 
