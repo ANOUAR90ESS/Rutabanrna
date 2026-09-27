@@ -4,14 +4,19 @@ import { formatClock, madridClock } from './clock';
 
 /**
  * Optional live predictions from the TMB iTransit API (https://developer.tmb.cat).
- * Enabled only when VITE_TMB_APP_ID and VITE_TMB_APP_KEY are set; otherwise the app
- * keeps using the official GTFS timetable.
+ *
+ * Recommended: VITE_TMB_PROXY_URL=/api/tmb → calls go through server/index.mjs, which adds
+ * the keys server-side (the TMB licence is bound to the registered app; keys shipped in
+ * client JavaScript can be copied by anyone).
+ * Development only: VITE_TMB_APP_ID / VITE_TMB_APP_KEY call TMB directly from the browser.
+ * Without either, the app keeps using the official GTFS timetable.
  */
+const PROXY = (import.meta.env.VITE_TMB_PROXY_URL as string | undefined)?.replace(/\/$/, '');
 const APP_ID = import.meta.env.VITE_TMB_APP_ID as string | undefined;
 const APP_KEY = import.meta.env.VITE_TMB_APP_KEY as string | undefined;
-const API = (import.meta.env.VITE_TMB_API_BASE as string | undefined) || 'https://api.tmb.cat/v1';
+const API = PROXY || (import.meta.env.VITE_TMB_API_BASE as string | undefined) || 'https://api.tmb.cat/v1';
 
-export const realtimeEnabled = Boolean(APP_ID && APP_KEY);
+export const realtimeEnabled = Boolean(PROXY || (APP_ID && APP_KEY));
 
 interface Prediction {
   line: string;
@@ -51,10 +56,10 @@ function normaliseLine(raw: string, net: TmbNetwork): string {
 
 export async function fetchRealtimeDepartures(station: Station, net: TmbNetwork, signal?: AbortSignal): Promise<Departure[] | null> {
   if (!realtimeEnabled || !station.stopCodes?.length) return null;
-  const auth = `app_id=${encodeURIComponent(APP_ID!)}&app_key=${encodeURIComponent(APP_KEY!)}`;
+  const auth = PROXY ? '' : `app_id=${encodeURIComponent(APP_ID!)}&app_key=${encodeURIComponent(APP_KEY!)}`;
   const urls = station.isBusStop
-    ? station.stopCodes.map((c) => `${API}/itransit/bus/parades/${encodeURIComponent(c)}?${auth}`)
-    : [`${API}/itransit/metro/estacions?estacions=${station.stopCodes.map(encodeURIComponent).join(',')}&${auth}`];
+    ? station.stopCodes.map((c) => `${API}/itransit/bus/parades/${encodeURIComponent(c)}${auth ? `?${auth}` : ''}`)
+    : [`${API}/itransit/metro/estacions?estacions=${station.stopCodes.map(encodeURIComponent).join(',')}${auth ? `&${auth}` : ''}`];
 
   const now = Date.now();
   const preds: Prediction[] = [];

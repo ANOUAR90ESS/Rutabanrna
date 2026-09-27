@@ -133,4 +133,4 @@ export type Place =
   | { kind: 'station'; stationId: string; name: string }
   | { kind: 'location'; lat: number; lng: number; name: string };
 
-export type AppTab = 'now' | 'trip' | 'map' | 'lines' | '3d' | 'landmarks' | 'alerts' | 'notices';
+export type AppTab = 'now' | 'trip' | 'map' | 'lines' | '3d' | 'landmarks' | 'alerts' | 'notices' | 'about';

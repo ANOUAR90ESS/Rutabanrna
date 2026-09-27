@@ -7,6 +7,7 @@ import type { Language, LiveVehicle, Station } from '../../types/transit';
 import type { TmbNetwork } from '../../services/network/engine';
 import { fmt, ui } from '../../i18n/ui';
 import { LineBadge, StationSearch, waitLabel } from '../now/shared';
+import { DataAttribution } from '../legal/DataAttribution';
 
 type Layout = NonNullable<ReturnType<TmbNetwork['stationLayout']>>;
 
@@ -316,6 +317,7 @@ export const Station3DView: React.FC<{
             </div>
           ))}
         </section>
+        <DataAttribution network={network} lang={lang} />
       </aside>
     </div>
   );

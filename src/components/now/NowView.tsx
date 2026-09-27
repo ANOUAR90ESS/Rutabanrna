@@ -32,6 +32,9 @@ interface NowViewProps {
   onOpenNotices: () => void;
   /** Slot rendered under the quick actions (e.g. "Last train home"). */
   children?: React.ReactNode;
+  /** Header banner (data status) and footer (source attribution). */
+  banner?: React.ReactNode;
+  footer?: React.ReactNode;
 }
 
 export const NowView: React.FC<NowViewProps> = (props) => {
@@ -79,6 +82,8 @@ export const NowView: React.FC<NowViewProps> = (props) => {
   return (
     <div className="w-full h-full overflow-y-auto bg-slate-950">
       <div className="max-w-2xl mx-auto px-4 pt-4 pb-28 space-y-4">
+        {props.banner}
+
         {/* Clock + search */}
         <div className="flex items-end justify-between">
           <div>
@@ -153,6 +158,7 @@ export const NowView: React.FC<NowViewProps> = (props) => {
             ))}
           </Section>
         )}
+        {props.footer}
       </div>
     </div>
   );

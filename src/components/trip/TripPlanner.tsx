@@ -34,11 +34,12 @@ interface TripPlannerProps {
   onRemindMe?: (j: Journey, from: Place, to: Place) => void;
   /** Extra panel (airport helper) rendered above results. */
   airportPanel?: (apply: (r: Omit<TripRequest, 'nonce'>) => void) => React.ReactNode;
+  footer?: React.ReactNode;
 }
 
 const secsToHHMM = (s: number) => formatClock(s);
 
-export const TripPlanner: React.FC<TripPlannerProps> = ({ network, router, now, lang, geo, onRequestLocation, fav, request, onShowOnMap, onRemindMe, airportPanel }) => {
+export const TripPlanner: React.FC<TripPlannerProps> = ({ network, router, now, lang, geo, onRequestLocation, fav, request, onShowOnMap, onRemindMe, airportPanel, footer }) => {
   const t = ui(lang);
   const [from, setFrom] = useState<Place | null>(null);
   const [to, setTo] = useState<Place | null>(null);
@@ -271,9 +272,10 @@ export const TripPlanner: React.FC<TripPlannerProps> = ({ network, router, now, 
           })}
         {!busy && results && results.length > 0 && (
           <p className="text-[10px] text-slate-500 px-1 flex items-center gap-1">
-            <Clock className="w-3 h-3" /> {ui(lang).walk}: 1,25 m/s · GTFS TMB
+            <Clock className="w-3 h-3" /> {ui(lang).walk}: 1,25 m/s
           </p>
         )}
+        {footer}
       </div>
     </div>
   );

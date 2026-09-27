@@ -142,10 +142,12 @@ const routes = routesCsv.map((r) => ({
 }));
 
 // Elevators per metro station code (TMB open data "accessos_estacio_linia")
+let accessesDate = '';
 const elevators = new Map();
 const accessesByCode = new Map(); // station code -> [{c, n, lat, lon, a, e}]
 if (fs.existsSync(ACCESS_SRC)) {
   const acc = JSON.parse(fs.readFileSync(ACCESS_SRC, 'utf8'));
+  accessesDate = String(acc.features[0]?.properties?.DATA || '').replace(/Z$/, '');
   for (const f of acc.features) {
     const p = f.properties;
     const code = String(p.CODI_ESTACIO);
@@ -405,6 +407,11 @@ const outX = [...xfer].map(([k, v]) => [...k.split(',').map(Number), v]);
 const out = {
   v: 1,
   feed: { publisher: feedInfo.feed_publisher_name || 'TMB', version: feedInfo.feed_version || '', start: feedStart, end: feedEnd },
+  // Source dates, shown in the app as required by the TMB reuse licence ("citar la fuente y la fecha de la última actualización")
+  sources: {
+    gtfsPublished: fs.statSync(path.join(dir, 'feed_info.txt')).mtime.toISOString(),
+    accessesDate
+  },
   generated: new Date().toISOString(),
   routes,
   stations: stations.map((s) => {

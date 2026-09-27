@@ -11,7 +11,9 @@ App de Metro y autobuses de TMB con datos **reales** (GTFS oficial). Cada pantal
 | **Más → Estación 3D** | ¿Por dónde entro y dónde está el andén? Accesos reales (accesibles con ascensor / solo escaleras), andenes por línea, tiempos de transbordo oficiales y trenes llegando. |
 | **Más → Mis avisos** | «Sal ahora para coger el L1 de las 08:47»: avisos ligados a salidas reales, con tiempo a pie y margen (funcionan con la app abierta). |
 
-Tiempo real TMB opcional: con claves de [developer.tmb.cat](https://developer.tmb.cat) (`VITE_TMB_APP_ID` / `VITE_TMB_APP_KEY` en `.env`) el panel de la estación usa las predicciones de iTransit; sin claves se usa el horario oficial y la app lo indica. Funciona sin conexión (service worker + paquete offline).
+Tiempo real TMB opcional: registra la app en [developer.tmb.cat](https://developer.tmb.cat), pon las claves en el servidor (`TMB_APP_ID` / `TMB_APP_KEY`, `npm start` sirve la app y hace de proxy) y construye con `VITE_TMB_PROXY_URL=/api/tmb`; así las claves no llegan al navegador. Sin claves se usa el horario oficial y la app lo indica. Funciona sin conexión (service worker + paquete offline).
+
+**Licencia de datos TMB:** la app cita la fuente y la fecha de actualización en pantalla, distingue los datos de TMB de los cálculos propios y se presenta como no oficial. Detalle y tareas pendientes del titular en [`docs/TMB-LICENCIA.md`](docs/TMB-LICENCIA.md).
 
 Búsqueda de direcciones: el texto buscado se envía a los servicios públicos de OpenStreetMap (Photon y, si falla, Nominatim); se pueden usar instancias propias con `VITE_PHOTON_URL` / `VITE_NOMINATIM_URL`.
 
@@ -24,6 +26,7 @@ bun install        # o npm install
 npm run dev        # http://localhost:3000
 npm run lint       # tsc --noEmit
 npm run build
+npm start          # servidor de producción: dist/ + proxy /api/tmb (claves TMB en el servidor)
 ```
 
 ## Actualizar los horarios (nuevo GTFS de TMB)
@@ -46,6 +49,8 @@ Los datos incluidos son válidos del **21/09/2026 al 31/12/2026**.
 | `src/services/geocode.ts` | Búsqueda de direcciones y lugares (Photon → Nominatim, datos OpenStreetMap), monumentos sin conexión y lugares recientes. |
 | `src/services/departureAlerts.ts` | Avisos «sal ahora» sobre salidas reales. |
 | `src/components/now/`, `trip/`, `alerts/`, `station3d/` | Pantallas Ahora, Ruta, Avisos y Estación 3D. |
+| `server/index.mjs` | Servidor de producción: sirve `dist/` y hace de proxy a iTransit con las claves en el servidor (solo endpoints permitidos). |
+| `src/components/legal/` | Atribución de fuentes y fechas, aviso de datos caducados, página «Fuentes y aviso legal». |
 | `src/hooks/useTmbNetwork.ts` | Carga la red (red → caché offline) y el reloj de la UI. |
 
 Fuente de datos: TMB, datos abiertos (licencia de reutilización de developer.tmb.cat). App no afiliada a TMB.
