@@ -5,6 +5,10 @@ import type { TmbNetwork } from '../../services/network/engine';
 import { realtimeEnabled } from '../../services/network/realtime';
 import { fmt, ui } from '../../i18n/ui';
 
+// Public site (e.g. https://barnatransit.vercel.app) so the Android app opens the hosted policy
+const PUBLIC_URL = ((import.meta.env.VITE_PUBLIC_URL as string | undefined) || '').replace(/\/$/, '');
+const PRIVACY_URL = `${PUBLIC_URL}/privacy.html`;
+
 /** Sources, what is TMB data vs. computed by the app, disclaimer and privacy (TMB reuse licence). */
 export const AboutView: React.FC<{ network: TmbNetwork; lang: Language }> = ({ network, lang }) => {
   const t = ui(lang);
@@ -51,6 +55,11 @@ export const AboutView: React.FC<{ network: TmbNetwork; lang: Language }> = ({ n
         </Section>
         <Section icon={<Lock className="w-4 h-4 text-slate-300" />} title="Privacy">
           <p>{t.aboutPrivacy}</p>
+          <p>
+            <a className="text-sky-400 underline" href={PRIVACY_URL} target="_blank" rel="noopener noreferrer">
+              privacy.html
+            </a>
+          </p>
         </Section>
       </div>
     </div>

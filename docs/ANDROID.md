@@ -18,6 +18,8 @@ La app llama al proxy de Vercel (las claves TMB nunca van en el APK):
 3. Vuelve a ejecutar el workflow. Sin esta variable la app usa el horario oficial (igual que sin claves).
 
 ## Versión firmada para Google Play
+> Guía completa de publicación (ficha, capturas, privacidad, seguridad de datos, pruebas): [`GOOGLE_PLAY.md`](GOOGLE_PLAY.md).
+
 1. Crea una clave (una sola vez, guárdala bien: sin ella no podrás actualizar la app en Play):
    ```bash
    keytool -genkeypair -v -keystore barnatransit.jks -alias barnatransit -keyalg RSA -keysize 2048 -validity 10000

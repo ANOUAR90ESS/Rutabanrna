@@ -102,6 +102,25 @@ export async function syncNativeAlerts(net: TmbNetwork, alerts: DepartureAlert[]
   }
 }
 
+/** Android 12+: exact alarms make "leave now" punctual; on Android 14+ they are off by default. */
+export async function exactAlarmsAllowed(): Promise<boolean> {
+  if (!isNative) return true;
+  try {
+    return (await LocalNotifications.checkExactNotificationSetting()).exact_alarm === 'granted';
+  } catch {
+    return true;
+  }
+}
+
+export async function openExactAlarmSetting(): Promise<boolean> {
+  if (!isNative) return true;
+  try {
+    return (await LocalNotifications.changeExactNotificationSetting()).exact_alarm === 'granted';
+  } catch {
+    return false;
+  }
+}
+
 export async function requestNativeNotificationPermission(): Promise<boolean> {
   if (!isNative) return false;
   const r = await LocalNotifications.requestPermissions();

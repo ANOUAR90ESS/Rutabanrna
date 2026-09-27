@@ -17,7 +17,7 @@ Tiempo real TMB opcional: registra la app en [developer.tmb.cat](https://develop
 
 Búsqueda de direcciones: el texto buscado se envía a los servicios públicos de OpenStreetMap (Photon y, si falla, Nominatim); se pueden usar instancias propias con `VITE_PHOTON_URL` / `VITE_NOMINATIM_URL`.
 
-**App Android:** el mismo código empaquetado con Capacitor; GitHub Actions compila el APK en cada push (avisos nativos con la app cerrada, horarios dentro del APK). Ver [`docs/ANDROID.md`](docs/ANDROID.md).
+**App Android:** el mismo código empaquetado con Capacitor; GitHub Actions compila el APK en cada push (avisos nativos con la app cerrada, horarios dentro del APK). Ver [`docs/ANDROID.md`](docs/ANDROID.md); publicación en Google Play: [`docs/GOOGLE_PLAY.md`](docs/GOOGLE_PLAY.md) (textos, capturas en `store/`, política de privacidad en `public/privacy.html`).
 
 **Despliegue web en Vercel:** `vercel.json` + función `api/tmb.js` (proxy de tiempo real con claves en el servidor).
 

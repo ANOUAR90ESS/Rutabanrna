@@ -161,9 +161,13 @@ export const Station3DView: React.FC<{
     scene.add(trainGroup);
     trainsRef.current = { group: trainGroup, depth, project };
 
+    // Portrait phones: start further away so labels don't pile up
+    const aspect0 = mount.clientWidth / Math.max(1, mount.clientHeight);
+    if (aspect0 < 0.9) camera.position.sub(controls.target).multiplyScalar(1.7).add(controls.target);
+
     const resize = () => {
       const w = mount.clientWidth, h = mount.clientHeight;
-      renderer.setSize(w, h, false);
+      renderer.setSize(w, h); // also sets the CSS size (high-DPI phones render at w×dpr)
       labels.setSize(w, h);
       camera.aspect = w / Math.max(1, h);
       camera.updateProjectionMatrix();
@@ -262,8 +266,8 @@ export const Station3DView: React.FC<{
 
   return (
     <div className="w-full h-full flex flex-col lg:flex-row bg-slate-950">
-      <div className="relative flex-1 min-h-[52vh]">
-        <div ref={mountRef} className="absolute inset-0" />
+      <div className="relative h-[55%] shrink-0 lg:h-auto lg:flex-1">
+        <div ref={mountRef} className="absolute inset-0 overflow-hidden" />
         <div className="absolute top-3 left-3 right-3 flex items-start justify-between gap-2 pointer-events-none">
           <div className="pointer-events-auto px-3 py-2 rounded-xl bg-slate-900/85 border border-slate-700 backdrop-blur">
             <div className="text-sm font-extrabold text-white">{metroStation.name}</div>
@@ -284,7 +288,7 @@ export const Station3DView: React.FC<{
         </div>
       </div>
 
-      <aside className="lg:w-96 shrink-0 overflow-y-auto max-h-[40vh] lg:max-h-none border-t lg:border-t-0 lg:border-l border-slate-800 p-3 space-y-3 pb-20 lg:pb-3">
+      <aside className="flex-1 min-h-0 lg:flex-none lg:w-96 overflow-y-auto border-t lg:border-t-0 lg:border-l border-slate-800 p-3 space-y-3">
         <section className="space-y-1">
           {groups.slice(0, 6).map((g) => {
             const d = g[0];

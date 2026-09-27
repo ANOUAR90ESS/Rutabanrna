@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BarnaTransit — Política de privacidad</title>
+<meta name="description" content="Política de privacidad de la app BarnaTransit (Metro y Bus TMB, no oficial).">
+<style>
+  :root { color-scheme: light dark; --bg:#ffffff; --fg:#0f172a; --muted:#475569; --line:#e2e8f0; --accent:#0369a1; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#020617; --fg:#e2e8f0; --muted:#94a3b8; --line:#1e293b; --accent:#38bdf8; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; } h2 { font-size: 1.15rem; margin: 28px 0 8px; }
+  p, li { color: var(--fg); } .muted { color: var(--muted); font-size: .9rem; }
+  a { color: var(--accent); } hr { border: 0; border-top: 1px solid var(--line); margin: 40px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: .95rem; } td, th { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+</style>
+</head>
+<body>
+<main>
+<h1>Política de privacidad de BarnaTransit</h1>
+<p class="muted">Última actualización: 27/09/2026 · <a href="#en">English below</a></p>
+
+<p><strong>BarnaTransit</strong> es una aplicación independiente y no oficial de información del Metro y los autobuses de TMB en Barcelona. No está afiliada a TMB. Esta política explica qué datos usa la app (web y Android) y por qué.</p>
+
+<h2>Resumen</h2>
+<ul>
+  <li>No hay cuentas de usuario, publicidad ni herramientas de analítica o seguimiento.</li>
+  <li>Tu ubicación, favoritos y avisos se quedan <strong>en tu dispositivo</strong>. No los enviamos a ningún servidor.</li>
+  <li>No vendemos ni compartimos datos personales.</li>
+</ul>
+
+<h2>Datos que usa la app</h2>
+<table>
+  <tr><th>Dato</th><th>Para qué</th><th>¿Sale del dispositivo?</th></tr>
+  <tr><td>Ubicación (aproximada y precisa), solo si das permiso</td><td>Mostrar estaciones cercanas y calcular rutas y el «último tren» desde donde estás.</td><td>No. Se procesa en el dispositivo y no se guarda.</td></tr>
+  <tr><td>Estaciones favoritas (Casa, Trabajo, ★), lugares recientes, avisos, idioma y preferencias</td><td>Recordar tus ajustes.</td><td>No. Se guardan solo en el almacenamiento local del dispositivo.</td></tr>
+  <tr><td>Notificaciones (Android)</td><td>Avisarte de cuándo salir para coger un tren o bus. Se programan en el propio dispositivo.</td><td>No.</td></tr>
+  <tr><td>Texto que escribes al buscar una dirección o lugar</td><td>Encontrar la dirección.</td><td>Sí: se envía a los servicios de búsqueda de OpenStreetMap (Photon de komoot y, como respaldo, Nominatim). No se envía tu ubicación.</td></tr>
+  <tr><td>Código de la estación o parada consultada</td><td>Pedir las próximas llegadas en tiempo real a TMB a través de nuestro servidor (Vercel), cuando está activado.</td><td>Sí, solo el código de la estación. No incluye datos personales.</td></tr>
+</table>
+
+<h2>Servicios de terceros</h2>
+<p>Al usar la app, tu dispositivo se conecta a estos servicios, que pueden registrar técnicamente tu dirección IP como cualquier web:</p>
+<ul>
+  <li>Mapa base: CARTO y OpenStreetMap (<a href="https://carto.com/privacy">privacidad de CARTO</a>).</li>
+  <li>Búsqueda de direcciones: Photon (komoot) y Nominatim (<a href="https://osmfoundation.org/wiki/Privacy_Policy">privacidad de OSMF</a>).</li>
+  <li>Alojamiento y proxy de tiempo real: Vercel (<a href="https://vercel.com/legal/privacy-policy">privacidad de Vercel</a>), que consulta la API de TMB.</li>
+</ul>
+
+<h2>Permisos de Android</h2>
+<ul>
+  <li><strong>Ubicación</strong>: estaciones cercanas y rutas desde tu posición. Opcional.</li>
+  <li><strong>Notificaciones</strong> y <strong>alarmas y recordatorios</strong>: avisos «Sal ahora» puntuales, también con la app cerrada. Opcionales.</li>
+  <li><strong>Internet</strong>: mapa, búsqueda de direcciones y tiempo real.</li>
+</ul>
+
+<h2>Conservación y borrado</h2>
+<p>Todos tus datos están en tu dispositivo. Puedes borrarlos eliminando tus avisos y favoritos en la app, borrando los datos de la app en los ajustes de Android o desinstalándola. En la web, borrando los datos del sitio en tu navegador.</p>
+
+<h2>Menores</h2>
+<p>La app no está dirigida específicamente a menores y no recoge datos personales de nadie.</p>
+
+<h2>Seguridad</h2>
+<p>Las conexiones a servicios externos usan HTTPS. Las claves de acceso a la API de TMB se guardan solo en el servidor.</p>
+
+<h2>Datos de transporte</h2>
+<p>Horarios, líneas, paradas y accesos: TMB, datos abiertos bajo su licencia de reutilización (developer.tmb.cat). TMB no garantiza la exactitud ni la disponibilidad de los datos.</p>
+
+<h2>Cambios y contacto</h2>
+<p>Si esta política cambia, se actualizará esta página y su fecha. Para cualquier consulta sobre privacidad: <a href="mailto:CONTACT_EMAIL" id="contact">CONTACT_EMAIL</a>.</p>
+
+<hr>
+
+<h1 id="en">BarnaTransit privacy policy</h1>
+<p class="muted">Last updated: 27/09/2026</p>
+<p><strong>BarnaTransit</strong> is an independent, unofficial app with information about TMB metro and buses in Barcelona. It is not affiliated with TMB.</p>
+<ul>
+  <li>No user accounts, ads, analytics or tracking.</li>
+  <li>Your location (only if you allow it), favourites, alerts and settings stay <strong>on your device</strong> and are never sent to our servers.</li>
+  <li>Text you type to search an address is sent to OpenStreetMap search services (Photon, Nominatim as fallback). Your location is not sent.</li>
+  <li>When real time is enabled, only the code of the station you look at is sent to our proxy (Vercel), which queries the TMB API.</li>
+  <li>Map tiles come from CARTO/OpenStreetMap. These services may log your IP address like any website.</li>
+  <li>Android permissions: location (nearby stations and routes), notifications and alarms &amp; reminders (on-time "leave now" alerts), internet. All optional except internet.</li>
+  <li>Delete your data by removing alerts and favourites in the app, clearing the app data in Android settings, or uninstalling.</li>
+  <li>We do not sell or share personal data. Contact: <a href="mailto:CONTACT_EMAIL">CONTACT_EMAIL</a>.</li>
+</ul>
+</main>
+</body>
+</html>

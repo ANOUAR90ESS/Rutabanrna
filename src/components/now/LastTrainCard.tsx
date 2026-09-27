@@ -62,6 +62,8 @@ export const LastTrainCard: React.FC<{
   if (!res) return null;
 
   const { last, morning, deadline, secs, continuous } = res;
+  // Only relevant in the evening: hide while there are more than 4 hours left
+  if (last && !continuous && last.dep - secs > 4 * 3600) return null;
   const rides = (last?.legs ?? []).filter((l): l is Extract<Leg, { kind: 'ride' }> => l.kind === 'ride');
   const left = last ? last.dep - secs : 0;
   const allNight = last && (continuous || last.dep >= deadline - 1800);

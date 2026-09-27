@@ -26,6 +26,8 @@ export interface DepartureAlert {
 
 export interface AlertStatus {
   alert: DepartureAlert;
+  /** why there is no departure to track right now */
+  idle?: 'not-today' | 'later' | 'ended';
   /** departure the alert is tracking (first catchable one inside the window today) */
   next?: Departure;
   /** seconds from now until the "leave now" notification */
@@ -65,10 +67,13 @@ export function madridWeekDay(ms: number): WeekDay {
 }
 
 export function evaluateAlert(net: TmbNetwork, a: DepartureAlert, ms: number): AlertStatus {
-  if (!a.enabled || !a.days.includes(madridWeekDay(ms))) return { alert: a };
+  if (!a.enabled) return { alert: a };
+  if (!a.days.includes(madridWeekDay(ms))) return { alert: a, idle: 'not-today' };
   const c = madridClock(ms);
   const from = toSecs(a.from), to = toSecs(a.to) < from ? toSecs(a.to) + 86400 : toSecs(a.to);
-  if (c.secs > to) return { alert: a };
+  if (c.secs > to) return { alert: a, idle: 'ended' };
+  // departures are looked up up to 3 h ahead: before that the alert is simply waiting
+  if (c.secs < from - (a.walkMinutes + a.leadMinutes) * 60 - 2 * 3600) return { alert: a, idle: 'later' };
   const lead = (a.walkMinutes + a.leadMinutes) * 60;
   const deps = net
     .departuresAt(a.stationId, ms, 12)
@@ -77,7 +82,7 @@ export function evaluateAlert(net: TmbNetwork, a: DepartureAlert, ms: number): A
     const at = c.secs + (d.timeEstimateSeconds ?? 0);
     return at >= from && at <= to && (d.timeEstimateSeconds ?? 0) >= a.walkMinutes * 60 - 30;
   });
-  if (!next) return { alert: a };
+  if (!next) return { alert: a, idle: c.secs < from ? 'later' : undefined };
   return { alert: a, next, notifyIn: (next.timeEstimateSeconds ?? 0) - lead };
 }
 
